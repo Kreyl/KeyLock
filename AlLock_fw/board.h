@@ -45,8 +45,10 @@
 // UART
 #define UART_GPIO       GPIOA
 #define UART_TX_PIN     9
-#define UART_RX_PIN     10
-#define UART_AF         AF7 // for all USARTs
+
+#define EXTUART_GPIO    GPIOA
+#define EXTUART_TX_PIN  2
+#define EXTUART_RX_PIN  3
 
 // RGB LED
 #define LED_RED_CH      { GPIOB, 0, TIM3, 3, invNotInverted, omPushPull, 255 }
@@ -84,12 +86,6 @@
 #if 1 // =========================== SPI =======================================
 #endif
 
-#if 1 // ========================== USART ======================================
-#define PRINTF_FLOAT_EN FALSE
-#define CMD_UART        USART1
-#define UART_TXBUF_SZ   1024
-#endif
-
 #if 1 // =========================== I2C =======================================
 // i2cclkPCLK1, i2cclkSYSCLK, i2cclkHSI
 #define I2C_CLK_SRC     i2cclkHSI
@@ -114,7 +110,28 @@
 // Remap is made automatically if required
 #define UART_DMA_TX     STM32_DMA1_STREAM4
 #define UART_DMA_RX     STM32_DMA1_STREAM5
-#define UART_DMA_CHNL   2
+#define UART_DMA_CHNL   2 // dummy
+#define UART_DMA_TX_MODE(Chnl) \
+                            (STM32_DMA_CR_CHSEL(Chnl) | \
+                            DMA_PRIORITY_LOW | \
+                            STM32_DMA_CR_MSIZE_BYTE | \
+                            STM32_DMA_CR_PSIZE_BYTE | \
+                            STM32_DMA_CR_MINC |       /* Memory pointer increase */ \
+                            STM32_DMA_CR_DIR_M2P |    /* Direction is memory to peripheral */ \
+                            STM32_DMA_CR_TCIE         /* Enable Transmission Complete IRQ */)
+
+#define UART_DMA_RX_MODE(Chnl) \
+                            (STM32_DMA_CR_CHSEL((Chnl)) | \
+                            DMA_PRIORITY_MEDIUM | \
+                            STM32_DMA_CR_MSIZE_BYTE | \
+                            STM32_DMA_CR_PSIZE_BYTE | \
+                            STM32_DMA_CR_MINC |       /* Memory pointer increase */ \
+                            STM32_DMA_CR_DIR_P2M |    /* Direction is peripheral to memory */ \
+                            STM32_DMA_CR_CIRC         /* Circular buffer enable */)
+
+
+#define EXTUART_DMA_TX  STM32_DMA1_STREAM7
+#define EXTUART_DMA_RX  STM32_DMA1_STREAM6
 
 // ==== I2C ====
 #define I2C1_DMA_TX     STM32_DMA2_STREAM7
@@ -147,3 +164,13 @@
 #endif // ADC
 
 #endif // DMA
+
+#if 1 // ========================== USART ======================================
+#define PRINTF_FLOAT_EN FALSE
+#define CMD_UART_PARAMS \
+        USART1, UART_GPIO, UART_TX_PIN, UART_DMA_TX, UART_DMA_TX_MODE(UART_DMA_CHNL)
+#define UART_TXBUF_SZ   1024
+
+#define EXT_UART        USART2
+#endif
+

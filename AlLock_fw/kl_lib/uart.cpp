@@ -11,24 +11,6 @@
 #include "kl_lib.h"
 
 #if 1 // ==================== Common and eternal ===============================
-#define UART_DMA_TX_MODE(Chnl) \
-                            STM32_DMA_CR_CHSEL(Chnl) | \
-                            DMA_PRIORITY_LOW | \
-                            STM32_DMA_CR_MSIZE_BYTE | \
-                            STM32_DMA_CR_PSIZE_BYTE | \
-                            STM32_DMA_CR_MINC |       /* Memory pointer increase */ \
-                            STM32_DMA_CR_DIR_M2P |    /* Direction is memory to peripheral */ \
-                            STM32_DMA_CR_TCIE         /* Enable Transmission Complete IRQ */
-
-#define UART_DMA_RX_MODE(Chnl) \
-                            STM32_DMA_CR_CHSEL((Chnl)) | \
-                            DMA_PRIORITY_MEDIUM | \
-                            STM32_DMA_CR_MSIZE_BYTE | \
-                            STM32_DMA_CR_PSIZE_BYTE | \
-                            STM32_DMA_CR_MINC |       /* Memory pointer increase */ \
-                            STM32_DMA_CR_DIR_P2M |    /* Direction is peripheral to memory */ \
-                            STM32_DMA_CR_CIRC         /* Circular buffer enable */
-
 // Pins Alternate function
 #if defined STM32L4XX || defined STM32F0XX
 #define UART_TX_REG     TDR
@@ -47,7 +29,8 @@
 static const UartParams_t UartParams = {
         CMD_UART,
         UART_GPIO, UART_TX_PIN,
-        UART_GPIO, UART_RX_PIN,
+        false,  // Rx disabled
+        UART_GPIO, UART_RX_PIN, // dummy
         // DMA
         UART_DMA_TX, UART_DMA_RX,
         UART_DMA_TX_MODE(UART_DMA_CHNL), UART_DMA_RX_MODE(UART_DMA_CHNL),
@@ -57,10 +40,6 @@ static const UartParams_t UartParams = {
 };
 
 #endif // Common and eternal
-
-// ===================================== Variables =============================
-thread_reference_t IRxThd = nullptr;
-CmdUart_t Uart {&UartParams};
 
 #if 1 // ========================= Base UART ===================================
 #if 1 // ==== TX ====

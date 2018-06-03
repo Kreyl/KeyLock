@@ -12,20 +12,35 @@
 #include "shell.h"
 #include "board.h"
 
-struct UartParams_t {
+struct UartTxParams_t {
+    uint32_t Baudrate;
     USART_TypeDef* Uart;
     GPIO_TypeDef *PGpioTx;
     uint16_t PinTx;
-    GPIO_TypeDef *PGpioRx;
-    uint16_t PinRx;
     // DMA
     const stm32_dma_stream_t *PDmaTx;
-    const stm32_dma_stream_t *PDmaRx;
-    uint32_t DmaModeTx, DmaModeRx;
+    uint32_t DmaModeTx;
     // MCU-specific
 #if defined STM32F072xB || defined STM32L4XX
     bool UseIndependedClock;
 #endif
+    UartTxParams_t(uint32_t ABaudrate, USART_TypeDef* APUart, GPIO_TypeDef *APGpioTx, uint16_t APinTx,
+    const stm32_dma_stream_t *APDmaTx, uint32_t ADmaModeTx
+#if defined STM32F072xB || defined STM32L4XX
+    , bool AUseIndependedClock;
+#endif
+    ) : Baudrate(ABaudrate), Uart(APUart), PGpioTx(APGpioTx), PinTx(APinTx), PDmaTx(APDmaTx), DmaModeTx(ADmaModeTx)
+#if defined STM32F072xB || defined STM32L4XX
+    , UseIndependedClock(AUseIndependedClock)
+#endif
+    {}
+};
+
+struct UartRxParams_t : public UartTxParams_t {
+    GPIO_TypeDef *PGpioRx;
+    uint16_t PinRx;
+    const stm32_dma_stream_t *PDmaRx;
+    uint32_t DmaModeRx;
 };
 
 #define UART_USE_DMA        TRUE
@@ -41,10 +56,9 @@ struct UartParams_t {
 #endif
 
 // ==== Base class ====
-class BaseUart_t {
+class BaseUartTx_t {
 private:
-    const UartParams_t *Params;
-    uint32_t IBaudrate;
+    const UartTxParams_t *Params;
 #if UART_USE_DMA
     char TXBuf[UART_TXBUF_SZ];
     char *PRead, *PWrite;
@@ -52,22 +66,15 @@ private:
     uint32_t IFullSlotsCount, ITransSize;
     void ISendViaDMA();
 #endif
-#if UART_RX_ENABLED
-    int32_t OldWIndx, RIndx;
-    uint8_t IRxBuf[UART_RXBUF_SZ];
-#endif
 protected:
     uint8_t IPutByte(uint8_t b);
     uint8_t IPutByteNow(uint8_t b);
     void IStartTransmissionIfNotYet();
     virtual void IOnTxEnd() = 0;
     // ==== Constructor ====
-    BaseUart_t(const UartParams_t *APParams) : Params(APParams), IBaudrate(115200)
+    BaseUart_t(const UartTxParams_t *APParams) : Params(APParams)
 #if UART_USE_DMA
     , PRead(TXBuf), PWrite(TXBuf), IDmaIsIdle(true), IFullSlotsCount(0), ITransSize(0)
-#endif
-#if UART_RX_ENABLED
-    , OldWIndx(0), RIndx(0)
 #endif
     {}
 public:
@@ -92,6 +99,16 @@ public:
     uint8_t GetByte(uint8_t *b);
 #endif
 };
+
+class BaseUartWithRx_t : public BaseUart_t {
+private:
+    int32_t OldWIndx, RIndx;
+    uint8_t IRxBuf[UART_RXBUF_SZ];
+public:
+    BaseUartWithRx_t(const UartParams_t *APParams) :
+        BaseUart_t(APParams), OldWIndx(0), RIndx(0) {}
+};
+
 
 class CmdUart_t : public BaseUart_t, public PrintfHelper_t, public Shell_t {
 private:
