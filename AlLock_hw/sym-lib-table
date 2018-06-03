@@ -1,0 +1,4 @@
+(sym_lib_table
+  (lib (name AlLock-rescue)(type Legacy)(uri ${KIPRJMOD}/AlLock-rescue.lib)(options "")(descr ""))
+  (lib (name Interface_kl)(type Legacy)(uri ${KICAD_SYMBOL_DIR}/Interface_kl.lib)(options "")(descr ""))
+)

@@ -1,6 +1,6 @@
-update=07.04.2016 21:05:11
+update=03.06.2018 12:50:45
 version=1
-last_client=eeschema
+last_client=kicad
 [pcbnew]
 version=1
 PadDrlX=320
@@ -70,15 +70,4 @@ NetIExt=net
 EquName1=devcms
 [eeschema]
 version=1
-LibDir=D:/libs/Kicad
-[eeschema/libraries]
-LibName1=AlLock-rescue
-LibName2=Connectors_kl
-LibName3=pcb_details
-LibName4=power
-LibName5=Power_kl
-LibName6=st_kl
-LibName7=Tittar_kl
-LibName8=Transistors_kl
-LibName9=Audio_kl
-LibName10=Interface_kl
+LibDir=
