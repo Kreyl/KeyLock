@@ -11,23 +11,23 @@
 #if 1 // =============== Low level ================
 // Forever
 EvtMsgQ_t<EvtMsg_t, MAIN_EVT_Q_LEN> EvtQMain;
-static const UartTxParams_t CmdUartParams(115200, CMD_UART_PARAMS);
-CmdUart_t Uart;
+static const UartParams_t CmdUartParams(115200, CMD_UART_PARAMS);
+CmdUart_t Uart{&CmdUartParams};
 void OnCmd(Shell_t *PShell);
 void ITask();
 
 // ==== External UART ====
 // Settings
-static const UartParams_t ExtParams = {
-        EXT_UART,
-        EXTUART_GPIO, EXTUART_TX_PIN,
-        true,
-        EXTUART_GPIO, EXTUART_RX_PIN,
-        // DMA
-        EXTUART_DMA_TX, EXTUART_DMA_RX,
-        UART_DMA_TX_MODE(0), UART_DMA_RX_MODE(0),
-};
-CmdUart_t ExtUart {&ExtParams};
+//static const UartParams_t ExtParams = {
+//        EXT_UART,
+//        EXTUART_GPIO, EXTUART_TX_PIN,
+//        true,
+//        EXTUART_GPIO, EXTUART_RX_PIN,
+//        // DMA
+//        EXTUART_DMA_TX, EXTUART_DMA_RX,
+//        UART_DMA_TX_MODE(0), UART_DMA_RX_MODE(0),
+//};
+//CmdUart_t ExtUart {&ExtParams};
 
 //static TmrKL_t TmrOneSecond {MS2ST(999), evtIdEverySecond, tktPeriodic}; // Measure battery periodically
 #endif
@@ -44,7 +44,7 @@ int main() {
 
     // ==== Init Hard & Soft ====
     EvtQMain.Init();
-    Uart.Init(115200);
+    Uart.Init();
     Printf("\r%S %S\r\n", APP_NAME, XSTRINGIFY(BUILD_TIME));
     Clk.PrintFreqs();
 

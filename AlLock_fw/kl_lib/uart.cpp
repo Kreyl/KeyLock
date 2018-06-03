@@ -22,24 +22,10 @@
 #error "Not defined"
 #endif
 
-// PutChar functions
-//void PutCharCmd(char c) { Uart.i
-
-// Settings
-static const UartParams_t UartParams = {
-        CMD_UART,
-        UART_GPIO, UART_TX_PIN,
-        false,  // Rx disabled
-        UART_GPIO, UART_RX_PIN, // dummy
-        // DMA
-        UART_DMA_TX, UART_DMA_RX,
-        UART_DMA_TX_MODE(UART_DMA_CHNL), UART_DMA_RX_MODE(UART_DMA_CHNL),
-#if defined STM32F072xB || defined STM32L4XX
-        UART_USE_INDEPENDENT_CLK
-#endif
-};
-
 #endif // Common and eternal
+
+// ===================================== Variables =============================
+thread_reference_t IRxThd = nullptr;
 
 #if 1 // ========================= Base UART ===================================
 #if 1 // ==== TX ====
@@ -265,7 +251,7 @@ uint8_t BaseUart_t::GetByte(uint8_t *b) {
 #endif // RX
 
 #if 1 // ==== Init ====
-void BaseUart_t::Init(uint32_t ABaudrate) {
+void BaseUart_t::Init() {
     AlterFunc_t PinAF = AF1;
     // ==== Tx pin ====
 #if defined STM32L4XX || defined STM32L1XX || defined STM32F2XX
@@ -284,12 +270,11 @@ void BaseUart_t::Init(uint32_t ABaudrate) {
     if(Params->PGpioTx == GPIOA) PinAF = AF1;
     else if(Params->PGpioTx == GPIOB) PinAF = AF0;
 #elif defined STM32F1XX
-    // Do nothing, as AF is not used
+    // Do nothing as F1xx does not use AF number
 #else
 #error "UART AF not defined"
 #endif
     PinSetupAlterFunc(Params->PGpioTx, Params->PinTx, omPushPull, pudNone, PinAF);
-    IBaudrate = ABaudrate;
     // ==== Clock ====
     if     (Params->Uart == USART1) { rccEnableUSART1(FALSE); }
     else if(Params->Uart == USART2) { rccEnableUSART2(FALSE); }
@@ -354,8 +339,6 @@ void BaseUart_t::Init(uint32_t ABaudrate) {
 #elif defined STM32F0XX
     if(Params->PGpioRx == GPIOA) PinAF = AF1;
     else if(Params->PGpioRx == GPIOB) PinAF = AF0;
-#elif defined STM32F1XX
-    // Do nothing, as AF is not used
 #else
 #error "UART AF not defined"
 #endif
@@ -397,8 +380,8 @@ void BaseUart_t::Shutdown() {
 
 void BaseUart_t::OnClkChange() {
 #if defined STM32L1XX || defined STM32F1XX
-    if(Params->Uart == USART1) Params->Uart->BRR = Clk.APB2FreqHz / IBaudrate;
-    else                       Params->Uart->BRR = Clk.APB1FreqHz / IBaudrate;
+    if(Params->Uart == USART1) Params->Uart->BRR = Clk.APB2FreqHz / Params->Baudrate;
+    else                       Params->Uart->BRR = Clk.APB1FreqHz / Params->Baudrate;
 #elif defined STM32F072xB
     if(Params->Uart == USART1 or Params->Uart == USART2) Params->Uart->BRR = HSI_FREQ_HZ / IBaudrate;
     else Params->Uart->BRR = Clk.APBFreqHz / IBaudrate;
@@ -419,14 +402,13 @@ void BaseUart_t::OnClkChange() {
 #endif // Base UART
 
 #if 1 // ========================= Cmd UART ====================================
-#if UART_RX_ENABLED // ==== RX ====
 static THD_WORKING_AREA(waUartRxThread, 128);
 __noreturn
 static void UartRxThread(void *arg) {
     chRegSetThreadName("UartRx");
     while(true) {
         chThdSleepMilliseconds(UART_RX_POLLING_MS);
-        Uart.IRxTask();
+//        Uart.IRxTask();
     }
 }
 
@@ -450,10 +432,9 @@ void CmdUart_t::SignalCmdProcessed() {
     if(IRxThd->state == CH_STATE_SUSPENDED) chSchReadyI(IRxThd);
     chSysUnlock();
 }
-#endif
 
-void CmdUart_t::Init(uint32_t ABaudrate) {
-    BaseUart_t::Init(ABaudrate);
+void CmdUart_t::Init() {
+    BaseUart_t::Init();
 #if UART_RX_ENABLED
     // Create RX Thread if not created
     if(IRxThd == nullptr) IRxThd = chThdCreateStatic(waUartRxThread, sizeof(waUartRxThread), NORMALPRIO, UartRxThread, NULL);

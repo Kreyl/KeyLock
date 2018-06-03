@@ -45,6 +45,7 @@
 // UART
 #define UART_GPIO       GPIOA
 #define UART_TX_PIN     9
+#define UART_RX_PIN     10
 
 #define EXTUART_GPIO    GPIOA
 #define EXTUART_TX_PIN  2
@@ -167,9 +168,12 @@
 
 #if 1 // ========================== USART ======================================
 #define PRINTF_FLOAT_EN FALSE
-#define CMD_UART_PARAMS \
-        USART1, UART_GPIO, UART_TX_PIN, UART_DMA_TX, UART_DMA_TX_MODE(UART_DMA_CHNL)
+#define CMD_UART        USART1
 #define UART_TXBUF_SZ   1024
+#define UART_RXBUF_SZ   99
+#define CMD_UART_PARAMS \
+    CMD_UART, UART_GPIO, UART_TX_PIN, UART_GPIO, UART_RX_PIN, \
+    UART_DMA_TX, UART_DMA_RX, UART_DMA_TX_MODE(UART_DMA_CHNL), UART_DMA_RX_MODE(UART_DMA_CHNL)
 
 #define EXT_UART        USART2
 #endif

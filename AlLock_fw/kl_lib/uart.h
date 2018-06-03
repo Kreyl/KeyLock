@@ -12,53 +12,47 @@
 #include "shell.h"
 #include "board.h"
 
-struct UartTxParams_t {
+struct UartParams_t {
     uint32_t Baudrate;
     USART_TypeDef* Uart;
     GPIO_TypeDef *PGpioTx;
     uint16_t PinTx;
+    GPIO_TypeDef *PGpioRx;
+    uint16_t PinRx;
     // DMA
     const stm32_dma_stream_t *PDmaTx;
-    uint32_t DmaModeTx;
+    const stm32_dma_stream_t *PDmaRx;
+    uint32_t DmaModeTx, DmaModeRx;
     // MCU-specific
 #if defined STM32F072xB || defined STM32L4XX
     bool UseIndependedClock;
 #endif
-    UartTxParams_t(uint32_t ABaudrate, USART_TypeDef* APUart, GPIO_TypeDef *APGpioTx, uint16_t APinTx,
-    const stm32_dma_stream_t *APDmaTx, uint32_t ADmaModeTx
+    UartParams_t(uint32_t ABaudrate, USART_TypeDef* AUart, GPIO_TypeDef *APGpioTx,
+            uint16_t APinTx, GPIO_TypeDef *APGpioRx, uint16_t APinRx,
+            const stm32_dma_stream_t *APDmaTx, const stm32_dma_stream_t *APDmaRx,
+            uint32_t ADmaModeTx, uint32_t ADmaModeRx
 #if defined STM32F072xB || defined STM32L4XX
-    , bool AUseIndependedClock;
+    bool AUseIndependedClock;
 #endif
-    ) : Baudrate(ABaudrate), Uart(APUart), PGpioTx(APGpioTx), PinTx(APinTx), PDmaTx(APDmaTx), DmaModeTx(ADmaModeTx)
+    ) :         Baudrate(ABaudrate), Uart(AUart), PGpioTx(APGpioTx), PinTx(APinTx),
+                PGpioRx(APGpioRx), PinRx(APinRx), PDmaTx(APDmaTx), PDmaRx(APDmaRx),
+                DmaModeTx(ADmaModeTx), DmaModeRx(ADmaModeRx)
 #if defined STM32F072xB || defined STM32L4XX
-    , UseIndependedClock(AUseIndependedClock)
+                , UseIndependedClock(AUseIndependedClock)
 #endif
     {}
-};
-
-struct UartRxParams_t : public UartTxParams_t {
-    GPIO_TypeDef *PGpioRx;
-    uint16_t PinRx;
-    const stm32_dma_stream_t *PDmaRx;
-    uint32_t DmaModeRx;
 };
 
 #define UART_USE_DMA        TRUE
 #define UART_USE_TXE_IRQ    FALSE
 
-// Set to true if RX needed
-#define UART_RX_ENABLED     TRUE
-
-#if UART_RX_ENABLED // ==== RX ====
-#define UART_RXBUF_SZ       99 // unprocessed bytes
 #define UART_CMD_BUF_SZ     54 // payload bytes
 #define UART_RX_POLLING_MS  99
-#endif
 
 // ==== Base class ====
-class BaseUartTx_t {
+class BaseUart_t {
 private:
-    const UartTxParams_t *Params;
+    const UartParams_t *Params;
 #if UART_USE_DMA
     char TXBuf[UART_TXBUF_SZ];
     char *PRead, *PWrite;
@@ -66,19 +60,22 @@ private:
     uint32_t IFullSlotsCount, ITransSize;
     void ISendViaDMA();
 #endif
+    int32_t OldWIndx, RIndx;
+    uint8_t IRxBuf[UART_RXBUF_SZ];
 protected:
     uint8_t IPutByte(uint8_t b);
     uint8_t IPutByteNow(uint8_t b);
     void IStartTransmissionIfNotYet();
     virtual void IOnTxEnd() = 0;
     // ==== Constructor ====
-    BaseUart_t(const UartTxParams_t *APParams) : Params(APParams)
+    BaseUart_t(const UartParams_t *APParams) : Params(APParams)
 #if UART_USE_DMA
     , PRead(TXBuf), PWrite(TXBuf), IDmaIsIdle(true), IFullSlotsCount(0), ITransSize(0)
 #endif
+    , OldWIndx(0), RIndx(0)
     {}
 public:
-    void Init(uint32_t ABaudrate);
+    void Init();
     void Shutdown();
     void OnClkChange();
     // Enable/Disable
@@ -94,21 +91,9 @@ public:
 #if UART_USE_DMA
     void IRQDmaTxHandler();
 #endif
-#if UART_RX_ENABLED
     uint32_t GetRcvdBytesCnt();
     uint8_t GetByte(uint8_t *b);
-#endif
 };
-
-class BaseUartWithRx_t : public BaseUart_t {
-private:
-    int32_t OldWIndx, RIndx;
-    uint8_t IRxBuf[UART_RXBUF_SZ];
-public:
-    BaseUartWithRx_t(const UartParams_t *APParams) :
-        BaseUart_t(APParams), OldWIndx(0), RIndx(0) {}
-};
-
 
 class CmdUart_t : public BaseUart_t, public PrintfHelper_t, public Shell_t {
 private:
@@ -123,7 +108,7 @@ private:
     }
 public:
     CmdUart_t(const UartParams_t *APParams) : BaseUart_t(APParams) {}
-    void Init(uint32_t ABaudrate);
+    void Init();
     void IRxTask();
     void SignalCmdProcessed();
 };
