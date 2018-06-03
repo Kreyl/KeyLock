@@ -22,10 +22,13 @@
 #error "Not defined"
 #endif
 
+// Universal VirtualTimer callback
+void UartCallback(void *p) {
+    chSysLockFromISR();
+    ((BaseUart_t*)p)->IIrqHandler();
+    chSysUnlockFromISR();
+}
 #endif // Common and eternal
-
-// ===================================== Variables =============================
-thread_reference_t IRxThd = nullptr;
 
 #if 1 // ========================= Base UART ===================================
 #if 1 // ==== TX ====
@@ -229,7 +232,7 @@ uint8_t BaseUart_t::IPutByteNow(uint8_t b) {
 }
 #endif // TX
 
-#if UART_RX_ENABLED // ==== RX ====
+#if 1 // ==== RX ====
 uint32_t BaseUart_t::GetRcvdBytesCnt() {
 #if defined STM32F2XX || defined STM32F4XX
     int32_t WIndx = UART_RXBUF_SZ - Params->PDmaRx->stream->NDTR;
@@ -399,46 +402,31 @@ void BaseUart_t::OnClkChange() {
 #endif
 }
 #endif // Init
-#endif // Base UART
 
-#if 1 // ========================= Cmd UART ====================================
-static THD_WORKING_AREA(waUartRxThread, 128);
-__noreturn
-static void UartRxThread(void *arg) {
-    chRegSetThreadName("UartRx");
-    while(true) {
-        chThdSleepMilliseconds(UART_RX_POLLING_MS);
-//        Uart.IRxTask();
-    }
+void BaseUart_t::StartRx() {
+    chVTSet(&TmrRx, UART_RX_POLLING_MS, UartCallback, this);
 }
 
-void CmdUart_t::IRxTask() {
-    // Iterate received bytes
-    uint8_t b;
-    while(GetByte(&b) == retvOk) {
-        if(Cmd.PutChar(b) == pdrNewCmd) {
-            chSysLock();
-            EvtMsg_t Msg(evtIdShellCmd, (Shell_t*)this);
-            if(EvtQMain.SendNowOrExitI(Msg) == retvOk) {
-                chSchGoSleepS(CH_STATE_SUSPENDED); // Wait until cmd processed
-            }
-            chSysUnlock();  // Will be here when application signals that cmd processed
-        } // if new cmd
-    } // whilw get byte
-}
-
-void CmdUart_t::SignalCmdProcessed() {
+void BaseUart_t::SignalRxProcessed() {
     chSysLock();
-    if(IRxThd->state == CH_STATE_SUSPENDED) chSchReadyI(IRxThd);
+    RxProcessed = true;
     chSysUnlock();
 }
 
-void CmdUart_t::Init() {
-    BaseUart_t::Init();
-#if UART_RX_ENABLED
-    // Create RX Thread if not created
-    if(IRxThd == nullptr) IRxThd = chThdCreateStatic(waUartRxThread, sizeof(waUartRxThread), NORMALPRIO, UartRxThread, NULL);
-#endif
+#endif // Base UART
+
+#if 1 // ========================= Cmd UART ====================================
+void CmdUart_t::IIrqHandler() {
+    chVTSetI(&TmrRx, UART_RX_POLLING_MS, UartCallback, this);
+    if(!RxProcessed) return;
+    uint8_t b;
+    while(GetByte(&b) == retvOk) {
+        if(Cmd.PutChar(b) == pdrNewCmd) {
+            RxProcessed = false;
+            EvtMsg_t Msg(evtIdShellCmd, (Shell_t*)this);
+            EvtQMain.SendNowOrExitI(Msg);
+        } // if new cmd
+    } // while get byte
 }
 #endif
 

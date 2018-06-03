@@ -63,6 +63,9 @@ private:
     int32_t OldWIndx, RIndx;
     uint8_t IRxBuf[UART_RXBUF_SZ];
 protected:
+    bool RxProcessed = true;
+    virtual_timer_t TmrRx;
+    void SignalRxProcessed();
     uint8_t IPutByte(uint8_t b);
     uint8_t IPutByteNow(uint8_t b);
     void IStartTransmissionIfNotYet();
@@ -76,6 +79,7 @@ protected:
     {}
 public:
     void Init();
+    void StartRx();
     void Shutdown();
     void OnClkChange();
     // Enable/Disable
@@ -93,6 +97,7 @@ public:
 #endif
     uint32_t GetRcvdBytesCnt();
     uint8_t GetByte(uint8_t *b);
+    virtual void IIrqHandler() = 0;
 };
 
 class CmdUart_t : public BaseUart_t, public PrintfHelper_t, public Shell_t {
@@ -108,9 +113,8 @@ private:
     }
 public:
     CmdUart_t(const UartParams_t *APParams) : BaseUart_t(APParams) {}
-    void Init();
-    void IRxTask();
-    void SignalCmdProcessed();
+    void IIrqHandler();
+    void SignalCmdProcessed() { BaseUart_t::SignalRxProcessed(); }
 };
 
 #define BYTE_UART_EN    FALSE
