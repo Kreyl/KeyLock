@@ -1366,6 +1366,92 @@ void Clk_t::PrintFreqs() {
             Clk.AHBFreqHz/1000000, Clk.APB1FreqHz/1000000, Clk.APB2FreqHz/1000000);
 }
 
+void Clk_t::SetCoreClk(CoreClk_t CoreClk) {
+    EnablePrefetch();
+    // Enable/disable HSE
+//    if(CoreClk >= cclk16MHz) {
+//        if(EnableHSE() != retvOk) return;   // Try to enable HSE
+//        DisablePLL();
+//    }
+    SetupPLLSrc(pllSrcHSIdiv2);
+
+    // Setup dividers
+    switch(CoreClk) {
+        case cclk8MHz:
+            break;
+        // Setup PLL (must be disabled first)
+        case cclk16MHz:
+            // 12MHz / 1 * 8 / (6 and 2) => 16 and 48MHz
+//            if(SetupPllMulDiv(1, 8, 6, 2) != retvOk) return;
+//            SetupFlashLatency(16, mvrHiPerf);
+            break;
+        case cclk24MHz:
+            SetupFlashLatency(24);
+            // 4MHz * 6 => 24MHz
+            if(SetupPllMulDiv(pllMul6, preDiv1) != retvOk) return;
+            break;
+        case cclk48MHz:
+            // 12MHz / 1 * 8 / 2 => 48 and 48MHz
+//            if(SetupPllMulDiv(1, 8, 2, 2) != retvOk) return;
+//            SetupFlashLatency(48, mvrHiPerf);
+            break;
+        case cclk72MHz:
+            // 12MHz / 1 * 24 => 72 and 48MHz
+//            if(SetupPllMulDiv(1, 24, 4, 6) != retvOk) return;
+//            SetupFlashLatency(72, mvrHiPerf);
+            break;
+    } // switch
+
+    if(CoreClk >= cclk16MHz) {
+        SetupBusDividers(ahbDiv1, apbDiv1, apbDiv1);
+        if(EnablePLL() == retvOk) SwitchToPLL();
+    }
+}
+
+void Clk_t::SetupFlashLatency(uint8_t AHBClk_MHz) {
+    uint32_t tmp = FLASH->ACR;
+    tmp &= ~FLASH_ACR_LATENCY;  // Clear Latency bits: 0 wait states
+    if(AHBClk_MHz > 24 and AHBClk_MHz <= 48) tmp |= 1; // 1 wait state
+    else if(AHBClk_MHz > 48) tmp |= 2; // 2 wait states
+    FLASH->ACR = tmp;
+}
+
+uint8_t Clk_t::SetupPllMulDiv(PllMul_t PllMul, PreDiv_t PreDiv) {
+    if(RCC->CR & RCC_CR_PLLON) return retvBusy; // PLL must be disabled to change dividers
+    uint32_t tmp = RCC->CFGR & ~RCC_CFGR_PLLMULL;
+    tmp |= ((uint32_t)PllMul) << 18;
+    RCC->CFGR = tmp;
+    return retvOk;
+}
+
+void Clk_t::SetupBusDividers(AHBDiv_t AHBDiv, APBDiv_t APB1Div, APBDiv_t APB2Div) {
+    // Setup dividers
+    uint32_t tmp = RCC->CFGR;
+    tmp &= ~(RCC_CFGR_HPRE | RCC_CFGR_PPRE1 | RCC_CFGR_PPRE2);  // Clear bits
+    tmp |= ((uint32_t)AHBDiv)  << 4;
+    tmp |= ((uint32_t)APB1Div) << 8;
+    tmp |= ((uint32_t)APB2Div) << 11;
+    RCC->CFGR = tmp;
+}
+
+uint8_t Clk_t::EnablePLL() {
+    RCC->CR |= RCC_CR_PLLON;
+    __NOP();__NOP();__NOP();__NOP();
+    // Wait until ready
+    uint32_t StartUpCounter=0;
+    do {
+        if(RCC->CR & RCC_CR_PLLRDY) return retvOk;   // PLL is ready
+        StartUpCounter++;
+    } while(StartUpCounter < CLK_STARTUP_TIMEOUT);
+    return retvTimeout;
+}
+
+uint8_t Clk_t::SwitchToPLL() {
+    RCC->CFGR |= RCC_CFGR_SW_PLL;   // Select PLL as system clock src
+    __NOP();__NOP();__NOP();__NOP();
+    while((RCC->CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_PLL); // Wait until ready
+    return retvOk;
+}
 
 #elif defined STM32F0XX
 #include "CRS_defins.h"

@@ -32,6 +32,7 @@
 									<listOptionValue builtIn="false" value="../os/hal"/>
 									<listOptionValue builtIn="false" value="../os/include"/>
 									<listOptionValue builtIn="false" value="../os/stm32f10x"/>
+									<listOptionValue builtIn="false" value="../sd"/>
 								</option>
 								<inputType id="com.atollic.truestudio.as.input.2030449801" name="Input" superClass="com.atollic.truestudio.as.input"/>
 							</tool>
@@ -43,6 +44,7 @@
 									<listOptionValue builtIn="false" value="../os/hal"/>
 									<listOptionValue builtIn="false" value="../os/include"/>
 									<listOptionValue builtIn="false" value="../os/stm32f10x"/>
+									<listOptionValue builtIn="false" value="../sd"/>
 								</option>
 								<option id="com.atollic.truestudio.common_options.target.endianess.214471112" name="Endianess" superClass="com.atollic.truestudio.common_options.target.endianess" useByScannerDiscovery="false"/>
 								<option id="com.atollic.truestudio.common_options.target.mcpu.1049016840" name="Microcontroller" superClass="com.atollic.truestudio.common_options.target.mcpu" useByScannerDiscovery="false" value="STM32F103RC" valueType="enumerated"/>
@@ -71,6 +73,7 @@
 									<listOptionValue builtIn="false" value="../os/stm32f10x"/>
 									<listOptionValue builtIn="false" value=".././"/>
 									<listOptionValue builtIn="false" value="../kl_lib"/>
+									<listOptionValue builtIn="false" value="../sd"/>
 								</option>
 								<option id="com.atollic.truestudio.common_options.target.endianess.817162052" name="Endianess" superClass="com.atollic.truestudio.common_options.target.endianess" useByScannerDiscovery="false"/>
 								<option id="com.atollic.truestudio.common_options.target.mcpu.257555817" name="Microcontroller" superClass="com.atollic.truestudio.common_options.target.mcpu" useByScannerDiscovery="false" value="STM32F103RC" valueType="enumerated"/>
@@ -99,7 +102,7 @@
 							</tool>
 							<tool id="com.atollic.truestudio.ar.base.1207351667" name="Archiver" superClass="com.atollic.truestudio.ar.base"/>
 							<tool id="com.atollic.truestudio.exe.debug.toolchain.secoutput.850093011" name="Other" superClass="com.atollic.truestudio.exe.debug.toolchain.secoutput">
-								<option id="com.atollic.truestudio.secoutput.general.convert.752355956" superClass="com.atollic.truestudio.secoutput.general.convert" useByScannerDiscovery="false" value="true" valueType="boolean"/>
+								<option id="com.atollic.truestudio.secoutput.general.convert.752355956" name="Convert build output" superClass="com.atollic.truestudio.secoutput.general.convert" useByScannerDiscovery="false" value="true" valueType="boolean"/>
 							</tool>
 						</toolChain>
 					</folderInfo>
@@ -156,6 +159,7 @@
 									<listOptionValue builtIn="false" value="../os/hal"/>
 									<listOptionValue builtIn="false" value="../os/include"/>
 									<listOptionValue builtIn="false" value="../os/stm32f10x"/>
+									<listOptionValue builtIn="false" value="../sd"/>
 								</option>
 								<inputType id="com.atollic.truestudio.as.input.2093627628" name="Input" superClass="com.atollic.truestudio.as.input"/>
 							</tool>
@@ -174,6 +178,7 @@
 									<listOptionValue builtIn="false" value="../os/hal"/>
 									<listOptionValue builtIn="false" value="../os/include"/>
 									<listOptionValue builtIn="false" value="../os/stm32f10x"/>
+									<listOptionValue builtIn="false" value="../sd"/>
 								</option>
 								<option id="com.atollic.truestudio.common_options.target.endianess.1130130837" name="Endianess" superClass="com.atollic.truestudio.common_options.target.endianess"/>
 								<option id="com.atollic.truestudio.common_options.target.mcpu.998798914" name="Microcontroller" superClass="com.atollic.truestudio.common_options.target.mcpu" value="STM32F103RC" valueType="enumerated"/>
@@ -208,6 +213,7 @@
 									<listOptionValue builtIn="false" value="../os/include"/>
 									<listOptionValue builtIn="false" value="../os/stm32f10x"/>
 									<listOptionValue builtIn="false" value="../kl_lib"/>
+									<listOptionValue builtIn="false" value="../sd"/>
 								</option>
 								<option id="com.atollic.truestudio.common_options.target.endianess.1430335215" name="Endianess" superClass="com.atollic.truestudio.common_options.target.endianess"/>
 								<option id="com.atollic.truestudio.common_options.target.mcpu.1143461472" name="Microcontroller" superClass="com.atollic.truestudio.common_options.target.mcpu" value="STM32F103RC" valueType="enumerated"/>

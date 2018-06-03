@@ -4,8 +4,8 @@
 #include "Sequences.h"
 #include "shell.h"
 #include "uart.h"
-//#include "kl_sd.h"
-//#include "kl_fs_utils.h"
+#include "kl_sd.h"
+#include "kl_fs_utils.h"
 //#include "battery_consts.h"
 
 #if 1 // =============== Low level ================
@@ -26,7 +26,7 @@ CmdUart_t ExtUart {&ExtUartParams};
 int main() {
 #if 1 // Low level init
     // ==== Setup clock ====
-//    Clk.SetCoreClk(cclk24MHz);
+    Clk.SetCoreClk(cclk24MHz);
     Clk.UpdateFreqValues();
 
     // ==== Init OS ====
@@ -34,6 +34,7 @@ int main() {
     chSysInit();
 
     // ==== Init Hard & Soft ====
+    JtagDisable();
     EvtQMain.Init();
     Uart.Init();
     Printf("\r%S %S\r\n", APP_NAME, XSTRINGIFY(BUILD_TIME));
@@ -42,6 +43,7 @@ int main() {
     ExtUart.Init();
     Printf(ExtUart, "aga\r");
     ExtUart.StartRx();
+
 //    SD.Init();
 //    SimpleSensors::Init();
 
@@ -85,17 +87,6 @@ void ITask() {
         } // switch
     } // while true
 }
-
-extern "C" {
-bool sdc_lld_is_card_inserted(SDCDriver *sdcp) {
-    return true;
-}
-bool sdc_lld_is_write_protected(SDCDriver *sdcp) {
-    return false;
-}
-
-}
-
 
 #if 1 // ======================= Command processing ============================
 void OnCmd(Shell_t *PShell) {

@@ -418,7 +418,6 @@ void BaseUart_t::SignalRxProcessed() {
 #if 1 // ========================= Cmd UART ====================================
 void CmdUart_t::IIrqHandler() {
     chVTSetI(&TmrRx, UART_RX_POLLING_MS, UartCallback, this);
-    PrintfI("i %u\r", GetRcvdBytesCnt());
     if(!RxProcessed) return;
     uint8_t b;
     while(GetByte(&b) == retvOk) {

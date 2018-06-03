@@ -855,7 +855,7 @@ static inline uint16_t PortGetValue(GPIO_TypeDef *PGpioPort) {
 }
 #endif // Simple pin manipulations
 
-#if defined STM32F10X_LD_VL // Disable JTAG, leaving SWD
+#if defined STM32F1XX // Disable JTAG, leaving SWD
 static inline void JtagDisable() {
     bool AfioWasEnabled = (RCC->APB2ENR & RCC_APB2ENR_AFIOEN);
     RCC->APB2ENR |= RCC_APB2ENR_AFIOEN;     // Enable AFIO
@@ -1447,7 +1447,7 @@ public:
     void DisablePLL() { RCC->CR &= ~RCC_CR_PLLON; }
 
     void SetupBusDividers(AHBDiv_t AHBDiv, APBDiv_t APB1Div, APBDiv_t APB2Div);
-    uint8_t SetupPLLDividers(PllMul_t PllMul, PreDiv_t PreDiv);
+    uint8_t SetupPllMulDiv(PllMul_t PllMul, PreDiv_t PreDiv);
     void SetupPLLSrc(PllSrc_t Src) {
         if(Src == pllSrcHSIdiv2) RCC->CFGR &= ~RCC_CFGR_PLLSRC;
         else RCC->CFGR |= RCC_CFGR_PLLSRC;
@@ -1474,6 +1474,7 @@ public:
 //        PWR->CR |= PWR_CR_DBP;
 //        RCC->CSR &= ~RCC_CSR_LSEON;
 //    }
+    void SetCoreClk(CoreClk_t CoreClk);
 
     void EnablePrefetch() {
         FLASH->ACR |= FLASH_ACR_PRFTBE; // May be written only when ACC64 is already set
