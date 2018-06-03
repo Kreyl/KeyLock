@@ -324,7 +324,7 @@ void BaseUart_t::Init() {
     IDmaIsIdle = true;
 #endif
 
-#if UART_RX_ENABLED
+    // ==== RX ====
     Params->Uart->CR1 = USART_CR1_TE | USART_CR1_RE;        // TX & RX enable
     Params->Uart->CR3 = USART_CR3_DMAT | USART_CR3_DMAR;    // Enable DMA at TX & RX
     // ==== Rx pin ====
@@ -342,10 +342,16 @@ void BaseUart_t::Init() {
 #elif defined STM32F0XX
     if(Params->PGpioRx == GPIOA) PinAF = AF1;
     else if(Params->PGpioRx == GPIOB) PinAF = AF0;
+#elif defined STM32F1XX
+    // Do nothing as F1xx does not use AF number
 #else
 #error "UART AF not defined"
 #endif
+#ifdef STM32F1XX // Setup pin as input
+    PinSetupInput(Params->PGpioRx, Params->PinRx, pudPullUp);
+#else
     PinSetupAlterFunc(Params->PGpioRx, Params->PinRx, omOpenDrain, pudPullUp, PinAF);
+#endif
     // Remap DMA request if needed
 #if defined STM32F0XX
     if(Params->PDmaRx == STM32_DMA1_STREAM5) SYSCFG->CFGR1 |= SYSCFG_CFGR1_USART1RX_DMA_RMP;
@@ -357,12 +363,6 @@ void BaseUart_t::Init() {
     dmaStreamSetTransactionSize(Params->PDmaRx, UART_RXBUF_SZ);
     dmaStreamSetMode      (Params->PDmaRx, Params->DmaModeRx);
     dmaStreamEnable       (Params->PDmaRx);
-#else // if UART_RX_ENABLED
-    Params->Uart->CR1 = USART_CR1_TE;     // Transmitter enabled
-#if UART_USE_DMA
-    Params->Uart->CR3 = USART_CR3_DMAT;   // Enable DMA at transmitter
-#endif
-#endif
     Params->Uart->CR1 |= USART_CR1_UE;    // Enable USART
 }
 
@@ -418,6 +418,7 @@ void BaseUart_t::SignalRxProcessed() {
 #if 1 // ========================= Cmd UART ====================================
 void CmdUart_t::IIrqHandler() {
     chVTSetI(&TmrRx, UART_RX_POLLING_MS, UartCallback, this);
+    PrintfI("i %u\r", GetRcvdBytesCnt());
     if(!RxProcessed) return;
     uint8_t b;
     while(GetByte(&b) == retvOk) {
@@ -427,6 +428,7 @@ void CmdUart_t::IIrqHandler() {
             EvtQMain.SendNowOrExitI(Msg);
         } // if new cmd
     } // while get byte
+//    PrintfI("e\r");
 }
 #endif
 

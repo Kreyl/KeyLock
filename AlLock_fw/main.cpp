@@ -17,17 +17,8 @@ void OnCmd(Shell_t *PShell);
 void ITask();
 
 // ==== External UART ====
-// Settings
-//static const UartParams_t ExtParams = {
-//        EXT_UART,
-//        EXTUART_GPIO, EXTUART_TX_PIN,
-//        true,
-//        EXTUART_GPIO, EXTUART_RX_PIN,
-//        // DMA
-//        EXTUART_DMA_TX, EXTUART_DMA_RX,
-//        UART_DMA_TX_MODE(0), UART_DMA_RX_MODE(0),
-//};
-//CmdUart_t ExtUart {&ExtParams};
+static const UartParams_t ExtUartParams(115200, EXT_UART_PARAMS);
+CmdUart_t ExtUart {&ExtUartParams};
 
 //static TmrKL_t TmrOneSecond {MS2ST(999), evtIdEverySecond, tktPeriodic}; // Measure battery periodically
 #endif
@@ -48,8 +39,9 @@ int main() {
     Printf("\r%S %S\r\n", APP_NAME, XSTRINGIFY(BUILD_TIME));
     Clk.PrintFreqs();
 
-//    ExtUart.Init(115200);
-//    ExtUart.
+    ExtUart.Init();
+    Printf(ExtUart, "aga\r");
+    ExtUart.StartRx();
 //    SD.Init();
 //    SimpleSensors::Init();
 
