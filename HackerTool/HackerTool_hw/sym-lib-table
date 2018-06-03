@@ -1,0 +1,4 @@
+(sym_lib_table
+  (lib (name HackerTool-rescue)(type Legacy)(uri ${KIPRJMOD}/HackerTool-rescue.lib)(options "")(descr ""))
+  (lib (name Interface_kl)(type Legacy)(uri ${KICAD_SYMBOL_DIR}/Interface_kl.lib)(options "")(descr ""))
+)
