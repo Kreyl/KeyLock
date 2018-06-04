@@ -1,6 +1,7 @@
 #include "hal.h"
 #include "MsgQ.h"
 #include "kl_lib.h"
+#include "color.h"
 #include "Sequences.h"
 #include "shell.h"
 #include "uart.h"
@@ -21,6 +22,9 @@ void ITask();
 // ==== External UART ====
 static const UartParams_t ExtUartParams(115200, EXT_UART_PARAMS);
 CmdUart_t ExtUart {&ExtUartParams};
+
+// Leds
+LedPcaBlinker_t LedA(0), LedB(2);
 
 // ==== Settings ====
 #define FNAME_LNG_MAX   36
@@ -85,9 +89,16 @@ int main() {
 
     // Leds
     i2c1.Init();
-    Leds.Init();
-    Leds.SetColor(0, clBlue);
-    Leds.SetColor(2, clBlue);
+    Pca9635.Init();
+//    Leds.SetColor(0, clBlue);
+//    Leds.SetColor(2, clBlue);
+    LedA.Init();
+    LedB.Init();
+    chSysLock();
+    LedA.SetColorI(clRed);
+    chSysUnlock();
+
+    LedB.StartOrRestart(lsqDoorOpening);
 
 //    TmrOneSecond.StartOrRestart();
 #endif

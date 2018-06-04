@@ -1,7 +1,8 @@
 #include "leds_pca.h"
 #include "kl_i2c.h"
 
-Leds_t Leds;
+EvtMsgQ_t<PcaMsg_t, MAIN_EVT_Q_LEN> EvtQPca;
+PCA9635_t Pca9635;
 
 // PCA registers
 struct LedsPkt_t {
@@ -19,26 +20,34 @@ struct LedsPkt_t {
 
 static const LedsPkt_t IPkt;
 
-void Leds_t::Init() {
-    // Init OE pin
+static THD_WORKING_AREA(waPcaThread, 128);
+__noreturn
+static void PcaThread(void *arg) {
+    chRegSetThreadName("Pca");
+    while(true) {
+        PcaMsg_t Msg = EvtQPca.Fetch(TIME_INFINITE);
+        Pca9635.SetColor(Msg.Indx, Msg.Color);
+    }
+}
+
+void PCA9635_t::Init() {
     PinSetupOut(LED_OE_PIN, omPushPull);
     OutputEnable();
     i2c1.Write(LED_I2C_ADDR, (uint8_t *)&IPkt, LEDS_PKT_SIZE);
+    // MsgQ and thread
+    EvtQPca.Init();
+    // Create and start thread
+    chThdCreateStatic(waPcaThread, sizeof(waPcaThread), NORMALPRIO, (tfunc_t)PcaThread, NULL);
 }
 
-void Leds_t::Task() {
-}
-
-
-// =============================== Light effects ===============================
-void Leds_t::SetPWM(uint8_t AChannel, uint8_t AValue) {
+void PCA9635_t::SetPWM(uint8_t AChannel, uint8_t AValue) {
     uint8_t Buf[2];
     Buf[0] = AChannel + 2;
     Buf[1] = AValue;
     i2c1.Write(LED_I2C_ADDR, Buf, 2);
 }
 
-void Leds_t::SetColor(uint8_t Indx, Color_t Clr) {
+void PCA9635_t::SetColor(uint8_t Indx, Color_t Clr) {
     uint8_t Buf[4];
     Buf[0] = (Indx * 3 + 2) | 0xA0;
     Buf[1] = Clr.R;
