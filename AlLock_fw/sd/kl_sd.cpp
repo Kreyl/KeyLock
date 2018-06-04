@@ -19,12 +19,12 @@ sd_t SD;
 void sd_t::Init() {
     IsReady = FALSE;
     // Bus pins
-//    PinSetupAlterFunc(SD_DAT0);
-//    PinSetupAlterFunc(SD_DAT1);
-//    PinSetupAlterFunc(SD_DAT2);
-//    PinSetupAlterFunc(SD_DAT3);
-//    PinSetupAlterFunc(SD_CLK);
-//    PinSetupAlterFunc(SD_CMD);
+    PinSetupAlterFunc(SD_DAT0);
+    PinSetupAlterFunc(SD_DAT1);
+    PinSetupAlterFunc(SD_DAT2);
+    PinSetupAlterFunc(SD_DAT3);
+    PinSetupAlterFunc(SD_CLK);
+    PinSetupAlterFunc(SD_CMD);
     // Power pin
     chThdSleepMilliseconds(1);    // Let power to stabilize
     PinSetupOut(SD_PWR_PIN, omPushPull);

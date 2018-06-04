@@ -44,7 +44,7 @@ int main() {
     Printf(ExtUart, "aga\r");
     ExtUart.StartRx();
 
-//    SD.Init();
+    SD.Init();
 //    SimpleSensors::Init();
 
 //    i2c2.Init();

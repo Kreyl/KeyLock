@@ -71,7 +71,7 @@
 
 // SD
 #define SD_PWR_PIN      GPIOC, 7
-#define SD_AF           AF12
+#define SD_AF           AF1
 #define SD_DAT0         GPIOC,  8, omPushPull, pudPullUp, SD_AF
 #define SD_DAT1         GPIOC,  9, omPushPull, pudPullUp, SD_AF
 #define SD_DAT2         GPIOC, 10, omPushPull, pudPullUp, SD_AF
