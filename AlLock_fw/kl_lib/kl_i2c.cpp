@@ -19,7 +19,7 @@
                         STM32_DMA_CR_DIR_P2M |      /* Direction is peripheral to memory */ \
                         STM32_DMA_CR_TCIE
 
-#if defined STM32L1XX || defined STM32F2XX
+#if defined STM32L1XX || defined STM32F2XX || defined STM32F1XX
 #if defined STM32F2XX
 #define I2C1_DMA_CHNL   1
 #define I2C2_DMA_CHNL   7
@@ -68,10 +68,14 @@ void i2c_t::Init() {
 #endif
     // ==== DMA ====
     // Here only unchanged parameters of the DMA are configured.
-    dmaStreamAllocate(PParams->PDmaTx, IRQ_PRIO_MEDIUM, i2cDmaIrqHandler, this);
-    dmaStreamSetPeripheral(PParams->PDmaTx, &PParams->pi2c->DR);
-    dmaStreamAllocate(PParams->PDmaRx, IRQ_PRIO_MEDIUM, i2cDmaIrqHandler, this);
-    dmaStreamSetPeripheral(PParams->PDmaRx, &PParams->pi2c->DR);
+    if(PParams->PDmaTx != nullptr) {
+        dmaStreamAllocate(PParams->PDmaTx, IRQ_PRIO_MEDIUM, i2cDmaIrqHandler, this);
+        dmaStreamSetPeripheral(PParams->PDmaTx, &PParams->pi2c->DR);
+    }
+    if(PParams->PDmaRx != nullptr) {
+        dmaStreamAllocate(PParams->PDmaRx, IRQ_PRIO_MEDIUM, i2cDmaIrqHandler, this);
+        dmaStreamSetPeripheral(PParams->PDmaRx, &PParams->pi2c->DR);
+    }
 }
 
 void i2c_t::Standby() {
@@ -90,11 +94,13 @@ void i2c_t::Standby() {
 void i2c_t::Resume() {
     Error = false;
     // ==== GPIOs ====
-    AlterFunc_t PinAF;
+    AlterFunc_t PinAF = AF1;
 #if defined STM32L1XX || defined STM32F2XX
     PinAF = AF4; // for all I2Cs everywhere
 //#elif defined STM32F0XX
 //    PinAF = AF4;
+#elif defined STM32F1XX
+    // Do nothing, as AF number is not used
 #else
 #error "I2C AF not defined"
 #endif
@@ -156,14 +162,16 @@ uint8_t i2c_t::WriteRead(uint8_t Addr,
     // Start TX DMA if needed
     if(WLength != 0) {
         if(WaitEv8() != retvOk) { Rslt = retvFail; goto WriteReadEnd; }
-        dmaStreamSetMemory0(PParams->PDmaTx, WPtr);
-        dmaStreamSetMode   (PParams->PDmaTx, PParams->DmaModeTx);
-        dmaStreamSetTransactionSize(PParams->PDmaTx, WLength);
-        chSysLock();
-        dmaStreamEnable(PParams->PDmaTx);
-        chThdSuspendS(&ThdRef);    // Wait IRQ
-        chSysUnlock();
-        dmaStreamDisable(PParams->PDmaTx);
+        if(PParams->PDmaTx != nullptr) {
+            dmaStreamSetMemory0(PParams->PDmaTx, WPtr);
+            dmaStreamSetMode   (PParams->PDmaTx, PParams->DmaModeTx);
+            dmaStreamSetTransactionSize(PParams->PDmaTx, WLength);
+            chSysLock();
+            dmaStreamEnable(PParams->PDmaTx);
+            chThdSuspendS(&ThdRef);    // Wait IRQ
+            chSysUnlock();
+            dmaStreamDisable(PParams->PDmaTx);
+        }
     }
     // Read if needed
     if(RLength != 0) {
@@ -177,15 +185,17 @@ uint8_t i2c_t::WriteRead(uint8_t Addr,
         if(RLength == 1) AckDisable();
         else AckEnable();
         ClearAddrFlag();
-        dmaStreamSetMemory0(PParams->PDmaRx, RPtr);
-        dmaStreamSetMode   (PParams->PDmaRx, PParams->DmaModeRx);
-        dmaStreamSetTransactionSize(PParams->PDmaRx, RLength);
-        SignalLastDmaTransfer(); // Inform DMA that this is last transfer => do not ACK last byte
-        chSysLock();
-        dmaStreamEnable(PParams->PDmaRx);
-        chThdSuspendS(&ThdRef);    // Wait IRQ
-        chSysUnlock();
-        dmaStreamDisable(PParams->PDmaRx);
+        if(PParams->PDmaRx != nullptr) {
+            dmaStreamSetMemory0(PParams->PDmaRx, RPtr);
+            dmaStreamSetMode   (PParams->PDmaRx, PParams->DmaModeRx);
+            dmaStreamSetTransactionSize(PParams->PDmaRx, RLength);
+            SignalLastDmaTransfer(); // Inform DMA that this is last transfer => do not ACK last byte
+            chSysLock();
+            dmaStreamEnable(PParams->PDmaRx);
+            chThdSuspendS(&ThdRef);    // Wait IRQ
+            chSysUnlock();
+            dmaStreamDisable(PParams->PDmaRx);
+        }
     } // if != 0
     else WaitBTF(); // if nothing to read, just stop
     SendStop();
@@ -295,14 +305,22 @@ uint8_t i2c_t::Write(uint8_t Addr, uint8_t *WPtr1, uint8_t WLength1) {
     // Start TX DMA if needed
     if(WLength1 != 0) {
         if(WaitEv8() != retvOk) { Rslt = retvFail; goto WriteEnd; }
-        dmaStreamSetMemory0(PParams->PDmaTx, WPtr1);
-        dmaStreamSetMode   (PParams->PDmaTx, PParams->DmaModeTx);
-        dmaStreamSetTransactionSize(PParams->PDmaTx, WLength1);
-        chSysLock();
-        dmaStreamEnable(PParams->PDmaTx);
-        chThdSuspendS(&ThdRef);    // Wait IRQ
-        chSysUnlock();
-        dmaStreamDisable(PParams->PDmaTx);
+        if(PParams->PDmaTx != nullptr) {
+            dmaStreamSetMemory0(PParams->PDmaTx, WPtr1);
+            dmaStreamSetMode   (PParams->PDmaTx, PParams->DmaModeTx);
+            dmaStreamSetTransactionSize(PParams->PDmaTx, WLength1);
+            chSysLock();
+            dmaStreamEnable(PParams->PDmaTx);
+            chThdSuspendS(&ThdRef);    // Wait IRQ
+            chSysUnlock();
+            dmaStreamDisable(PParams->PDmaTx);
+        }
+        else {
+            for(uint32_t i=0; i<WLength1; i++) {
+                PParams->pi2c->DR = WPtr1[i];
+                if(WaitEv8() != retvOk) { Rslt = retvFail; goto WriteEnd; }
+            }
+        }
     }
     WaitBTF();
     SendStop();

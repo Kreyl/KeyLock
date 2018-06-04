@@ -25,7 +25,7 @@
 #define SYS_TIM_CLK             (Clk.APB1FreqHz)    // Timer 5 is clocked by APB1
 
 //  Periphery
-#define I2C1_ENABLED            FALSE
+#define I2C1_ENABLED            TRUE
 #define I2C2_ENABLED            FALSE
 #define I2C3_ENABLED            FALSE
 #define SIMPLESENSORS_ENABLED   FALSE
@@ -51,10 +51,8 @@
 #define EXTUART_TX_PIN  2
 #define EXTUART_RX_PIN  3
 
-// RGB LED
-#define LED_RED_CH      { GPIOB, 0, TIM3, 3, invNotInverted, omPushPull, 255 }
-#define LED_GREEN_CH    { GPIOB, 1, TIM3, 4, invNotInverted, omPushPull, 255 }
-#define LED_BLUE_CH     { GPIOB, 4, TIM3, 1, invNotInverted, omPushPull, 255 }
+// LED controller
+#define LED_OE_PIN      GPIOA, 12
 
 // I2C
 #define I2C1_GPIO       GPIOB
@@ -88,9 +86,7 @@
 #endif
 
 #if 1 // =========================== I2C =======================================
-// i2cclkPCLK1, i2cclkSYSCLK, i2cclkHSI
-#define I2C_CLK_SRC     i2cclkHSI
-#define I2C_BAUDRATE_HZ 400000
+#define I2C1_BAUDRATE 400000
 #endif
 
 #if ADC_REQUIRED // ======================= Inner ADC ==========================
@@ -135,8 +131,8 @@
 #define EXTUART_DMA_RX  STM32_DMA1_STREAM6
 
 // ==== I2C ====
-#define I2C1_DMA_TX     STM32_DMA2_STREAM7
-#define I2C1_DMA_RX     STM32_DMA2_STREAM6
+#define I2C1_DMA_TX     nullptr //STM32_DMA2_STREAM7
+#define I2C1_DMA_RX     nullptr //STM32_DMA2_STREAM6
 #define I2C1_DMA_CHNL   5
 #define I2C2_DMA_TX     STM32_DMA1_STREAM4
 #define I2C2_DMA_RX     STM32_DMA1_STREAM5

@@ -6,6 +6,8 @@
 #include "uart.h"
 #include "kl_sd.h"
 #include "kl_fs_utils.h"
+#include "kl_i2c.h"
+#include "leds_pca.h"
 //#include "battery_consts.h"
 
 #if 1 // =============== Low level ================
@@ -71,7 +73,6 @@ int main() {
     Clk.PrintFreqs();
 
     ExtUart.Init();
-    Printf(ExtUart, "aga\r");
     ExtUart.StartRx();
 
     SD.Init();
@@ -83,7 +84,11 @@ int main() {
 
 //    SimpleSensors::Init();
 
-//    i2c2.Init();
+    // Leds
+    i2c1.Init();
+    Leds.Init();
+    Leds.SetColor(0, clYellow);
+    Leds.SetColor(2, clWhite);
 
 //    TmrOneSecond.StartOrRestart();
 #endif
