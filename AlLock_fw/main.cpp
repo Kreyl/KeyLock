@@ -81,14 +81,13 @@ int main() {
         while(true);    // nothing to do if config not read
     }
 
-
 //    SimpleSensors::Init();
 
     // Leds
     i2c1.Init();
     Leds.Init();
-    Leds.SetColor(0, clYellow);
-    Leds.SetColor(2, clWhite);
+    Leds.SetColor(0, clBlue);
+    Leds.SetColor(2, clBlue);
 
 //    TmrOneSecond.StartOrRestart();
 #endif
