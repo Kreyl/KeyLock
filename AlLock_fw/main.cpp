@@ -20,6 +20,36 @@ void ITask();
 static const UartParams_t ExtUartParams(115200, EXT_UART_PARAMS);
 CmdUart_t ExtUart {&ExtUartParams};
 
+// ==== Settings ====
+#define FNAME_LNG_MAX   36
+#define CODE_LNG_MAX    6
+
+static struct Settings_t {
+    char SndKeyBeep[FNAME_LNG_MAX], SndKeyDrop[FNAME_LNG_MAX], SndPassError[FNAME_LNG_MAX], SndOpen[FNAME_LNG_MAX];
+    char SndClose[FNAME_LNG_MAX], SndKeyCrash[FNAME_LNG_MAX];
+    // Codes
+    char CodeA[CODE_LNG_MAX+1], CodeB[CODE_LNG_MAX+1], ServiceCode[CODE_LNG_MAX+1]; // Because of trailing \0
+    int8_t CodeALength, CodeBLength;     // Length of 0 means empty, negative length means crash
+    char Complexity[4];
+    // Colors
+    Color_t ColorDoorOpen, ColorDoorOpening, ColorDoorClosed, ColorDoorClosing;
+    uint32_t BlinkDelay;
+    // Timings
+    uint32_t DoorCloseDelay, KeyDropDelay;
+    // Methods
+    uint8_t Read();
+} Settings;
+
+enum EntrResult_t {entNA, entError, entOpen};
+struct Codecheck_t {
+    uint32_t Timer;
+    char EnteredCode[CODE_LNG_MAX+1];   // Because of trailing \0
+    uint8_t EnteredLength;
+    EntrResult_t EnterResult;
+    void Task(void);
+    void Reset(void) { EnteredLength=0; EnterResult=entNA; memset(EnteredCode, 0, CODE_LNG_MAX); }
+} Codecheck;
+
 //static TmrKL_t TmrOneSecond {MS2ST(999), evtIdEverySecond, tktPeriodic}; // Measure battery periodically
 #endif
 
@@ -45,6 +75,12 @@ int main() {
     ExtUart.StartRx();
 
     SD.Init();
+    if (Settings.Read() != retvOk) {
+        Printf("Settings read error\r");
+        while(true);    // nothing to do if config not read
+    }
+
+
 //    SimpleSensors::Init();
 
 //    i2c2.Init();
@@ -86,6 +122,53 @@ void ITask() {
             default: break;
         } // switch
     } // while true
+}
+
+uint8_t Settings_t::Read() {
+    // Sound names
+    if(ini::ReadStringTo("lock.ini", "Sound", "KeyBeep",   Settings.SndKeyBeep,   FNAME_LNG_MAX) != retvOk) return retvFail;
+    if(ini::ReadStringTo("lock.ini", "Sound", "KeyDrop",   Settings.SndKeyDrop,   FNAME_LNG_MAX) != retvOk) return retvFail;
+    if(ini::ReadStringTo("lock.ini", "Sound", "KeyCrash",  Settings.SndKeyCrash,  FNAME_LNG_MAX) != retvOk) return retvFail;
+    if(ini::ReadStringTo("lock.ini", "Sound", "PassError", Settings.SndPassError, FNAME_LNG_MAX) != retvOk) return retvFail;
+    if(ini::ReadStringTo("lock.ini", "Sound", "Open",      Settings.SndOpen,      FNAME_LNG_MAX) != retvOk) return retvFail;
+    if(ini::ReadStringTo("lock.ini", "Sound", "Close",     Settings.SndClose,     FNAME_LNG_MAX) != retvOk) return retvFail;
+
+    // ======= Codes =======
+    // If length == 0 then code is empty. If code is negative (-1 for examle) then side is crashed
+    // === Code A ===
+    if(ini::ReadStringTo("lock.ini", "Code", "CodeA", Settings.CodeA, CODE_LNG_MAX) != retvOk) return retvFail;
+    Settings.CodeALength = strlen(Settings.CodeA);
+    if (Settings.CodeALength != 0) {
+        if (Settings.CodeA[0] == 'N') Settings.CodeALength = 0;     // Check if None
+        if (Settings.CodeA[0] == '-') Settings.CodeALength = -1;    // Check if crashed
+    }
+
+    // === Code B ===
+    if(ini::ReadStringTo("lock.ini", "Code", "CodeB", Settings.CodeB, CODE_LNG_MAX) != retvOk) return retvFail;
+    Settings.CodeBLength = strlen(Settings.CodeB);
+    if (Settings.CodeBLength !=0) {
+        if (Settings.CodeB[0] == 'N') Settings.CodeBLength = 0;     // Check if None
+        if (Settings.CodeB[0] == '-') Settings.CodeBLength = -1;    // Check if crashed
+    }
+
+    // === Service code ===
+    if(ini::ReadStringTo("lock.ini", "Code", "ServiceCode", Settings.ServiceCode, CODE_LNG_MAX) != retvOk) return retvFail;
+
+    // Complexity
+    if(ini::ReadStringTo("lock.ini", "Code", "Complexity", Settings.Complexity, 3) != retvOk) return retvFail;
+
+    // Colors
+    if(ini::ReadColor("lock.ini", "Colors", "DoorOpen",    &Settings.ColorDoorOpen)    != retvOk) return retvFail;
+    if(ini::ReadColor("lock.ini", "Colors", "DoorOpening", &Settings.ColorDoorOpening) != retvOk) return retvFail;
+    if(ini::ReadColor("lock.ini", "Colors", "DoorClosed",  &Settings.ColorDoorClosed)  != retvOk) return retvFail;
+    if(ini::ReadColor("lock.ini", "Colors", "DoorClosing", &Settings.ColorDoorClosing) != retvOk) return retvFail;
+    if(ini::Read<uint32_t>("lock.ini", "Colors", "BlinkDelay", &Settings.BlinkDelay)   != retvOk) return retvFail;
+
+    // Timings
+    if(ini::Read<uint32_t>("lock.ini", "Timings", "DoorCloseDelay", &Settings.DoorCloseDelay) != retvOk) return retvFail;
+    if(ini::Read<uint32_t>("lock.ini", "Timings", "KeyDropDelay",   &Settings.KeyDropDelay)   != retvOk) return retvFail;
+
+    return retvOk;
 }
 
 #if 1 // ======================= Command processing ============================
