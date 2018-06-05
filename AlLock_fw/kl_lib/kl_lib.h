@@ -940,7 +940,7 @@ extern "C" {
 #if INDIVIDUAL_EXTI_IRQ_REQUIRED
 extern IrqHandler_t *ExtiIrqHandler[16];
 #else
-#if defined STM32L1XX || defined STM32F4XX || defined STM32F2XX || defined STM32L4XX
+#if defined STM32L1XX || defined STM32F4XX || defined STM32F2XX || defined STM32L4XX || defined STM32F1XX
 extern IrqHandler_t *ExtiIrqHandler[5], *ExtiIrqHandler_9_5, *ExtiIrqHandler_15_10;
 #elif defined STM32F030 || defined STM32F0
 extern IrqHandler_t *ExtiIrqHandler_0_1, *ExtiIrqHandler_2_3, *ExtiIrqHandler_4_15;
@@ -958,7 +958,7 @@ public:
 #if INDIVIDUAL_EXTI_IRQ_REQUIRED
         ExtiIrqHandler[APinN] = PIrqHandler;
 #else
-    #if defined STM32L1XX || defined STM32F4XX || defined STM32F2XX || defined STM32L4XX
+    #if defined STM32L1XX || defined STM32F4XX || defined STM32F2XX || defined STM32L4XX || defined STM32F1XX
         if(APinN >= 0 and APinN <= 4) ExtiIrqHandler[APinN] = PIrqHandler;
         else if(APinN <= 9) ExtiIrqHandler_9_5 = PIrqHandler;
         else ExtiIrqHandler_15_10 = PIrqHandler;
@@ -1268,7 +1268,7 @@ namespace EE {
 
 #if 1 // =========================== Clocking ==================================
 // Common
-enum CoreClk_t {cclk8MHz, cclk16MHz, cclk24MHz, cclk48MHz, cclk72MHz};
+enum CoreClk_t {cclk8MHz, cclk12MHz, cclk16MHz, cclk24MHz, cclk48MHz, cclk72MHz};
 
 #if defined STM32L1XX
 #include "stm32l1xx.h"

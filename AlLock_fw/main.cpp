@@ -9,8 +9,7 @@
 #include "kl_fs_utils.h"
 #include "kl_i2c.h"
 #include "leds_pca.h"
-#include "vs.h"
-#include "media.h"
+#include "sound.h"
 //#include "battery_consts.h"
 
 #if 1 // =============== Low level ================
@@ -64,7 +63,7 @@ struct Codecheck_t {
 int main() {
 #if 1 // Low level init
     // ==== Setup clock ====
-    Clk.SetCoreClk(cclk24MHz);
+    Clk.SetCoreClk(cclk12MHz);
     Clk.UpdateFreqValues();
 
     // ==== Init OS ====
@@ -96,8 +95,11 @@ int main() {
     LedB.Init();
 
     // Sound
-    Vs.Init();
-    ESnd.Init();
+    Sound.Init();
+//    while(true) {
+        Sound.Play("alive.wav");
+//        chThdSleepMilliseconds(7002);
+//    }
 
 //    TmrOneSecond.StartOrRestart();
 #endif
@@ -129,9 +131,9 @@ void ITask() {
                 break;
 
 
-//            case evtIdSoundFileEnd:
-////                Printf("SoundFile end: %u\r", Msg.Value);
-//                break;
+            case evtIdSoundEnd:
+                Printf("Sound end\r");
+                break;
 
             default: break;
         } // switch
