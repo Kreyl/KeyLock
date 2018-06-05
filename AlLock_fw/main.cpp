@@ -63,7 +63,7 @@ struct Codecheck_t {
 int main() {
 #if 1 // Low level init
     // ==== Setup clock ====
-    Clk.SetCoreClk(cclk12MHz);
+//    Clk.SetCoreClk(cclk12MHz);
     Clk.UpdateFreqValues();
 
     // ==== Init OS ====
@@ -96,10 +96,7 @@ int main() {
 
     // Sound
     Sound.Init();
-//    while(true) {
-        Sound.Play("alive.wav");
-//        chThdSleepMilliseconds(7002);
-//    }
+    Sound.Play("alive.wav");
 
 //    TmrOneSecond.StartOrRestart();
 #endif

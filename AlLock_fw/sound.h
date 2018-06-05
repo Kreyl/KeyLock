@@ -97,7 +97,7 @@ private:
     inline void StartTransmissionIfNotBusy() {
         chSysLock();
         if(IDmaIdle and IDreq.IsHi()) {
-            PrintfI("TXinB\r");
+//            PrintfI("TXinB\r");
             IDreq.EnableIrq(IRQ_PRIO_MEDIUM);
             IDreq.GenerateIrq();    // Do not call SendNexData directly because of its interrupt context
         }

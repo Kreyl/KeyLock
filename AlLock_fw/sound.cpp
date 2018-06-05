@@ -26,7 +26,7 @@ static const uint8_t SZero = 0;
 // ================================= IRQ =======================================
 // Dreq IRQ
 void Sound_t::IIrqHandler() {
-    PrintfI("vsIrq\r");
+//    PrintfI("vsIrq\r");
     IDreq.DisableIrq();
     EvtQVs.SendNowOrExitI(VsMsg_t(VSMSG_DREQ_IRQ));
 }
@@ -53,18 +53,18 @@ void Sound_t::ITask() {
         VsMsg_t Msg = EvtQVs.Fetch(TIME_INFINITE);
         switch(Msg.ID) {
             case VSMSG_STOP:
-                Printf("Stop\r");
+//                Printf("Stop\r");
                 PrepareToStop();
                 break;
 
             case VSMSG_DREQ_IRQ:
-                Printf("Dreq\r");
-                chThdSleepMilliseconds(1);  // Make a pause after IRQ rise
+//                Printf("Dreq\r");
+//                chThdSleepMilliseconds(1);  // Make a pause after IRQ rise
                 ISendNextData();
                 break;
 
             case VSMSG_DMA_DONE:
-                Printf("DmaDone\r");
+//                Printf("DmaDone\r");
                 ISpi.WaitBsyHi2Lo();                   // Wait SPI transaction end
                 if(Clk.AHBFreqHz > 12000000) DelayLoop(450); // Make a solemn pause
                 XCS_Hi();                           // }
@@ -75,17 +75,17 @@ void Sound_t::ITask() {
                 break;
 
             case VSMSG_COMPLETED:
-                Printf("Completed\r");
+//                Printf("Completed\r");
 //                WriteCmd(VS_REG_MODE, 0x0004);    // Soft reset
                 if(IFilename != NULL) IPlayNew();
                 else {
-//                    AmplifierOff();    // switch off the amplifier to save energy
+                    AmplifierOff();    // switch off the amplifier to save energy
                     EvtQMain.SendNowOrExit(EvtMsg_t(evtIdSoundEnd));
                 }
                 break;
 
             case VSMSG_READ_NEXT: {
-                Printf("readNext; L= %u %u\r", Buf1.DataSz, Buf2.DataSz);
+//                Printf("readNext; L= %u %u\r", Buf1.DataSz, Buf2.DataSz);
                 FRESULT rslt = FR_OK;
                 bool Eof = f_eof(&IFile);
                 // Read next if not EOF
@@ -121,13 +121,13 @@ void Sound_t::Init() {
     if(ISpi.PSpi == SPI1) div = Clk.APB2FreqHz / VS_MAX_SPI_BAUDRATE_HZ;
     else div = Clk.APB1FreqHz / VS_MAX_SPI_BAUDRATE_HZ;
     SpiClkDivider_t ClkDiv = sclkDiv2;
-    if     (div > 128) ClkDiv = sclkDiv256;
-    else if(div > 64) ClkDiv = sclkDiv128;
-    else if(div > 32) ClkDiv = sclkDiv64;
-    else if(div > 16) ClkDiv = sclkDiv32;
-    else if(div > 8)  ClkDiv = sclkDiv16;
-    else if(div > 4)  ClkDiv = sclkDiv8;
-    else if(div > 2)  ClkDiv = sclkDiv4;
+    if     (div >= 128) ClkDiv = sclkDiv256;
+    else if(div >= 64) ClkDiv = sclkDiv128;
+    else if(div >= 32) ClkDiv = sclkDiv64;
+    else if(div >= 16) ClkDiv = sclkDiv32;
+    else if(div >= 8)  ClkDiv = sclkDiv16;
+    else if(div >= 4)  ClkDiv = sclkDiv8;
+    else if(div >= 2)  ClkDiv = sclkDiv4;
     ISpi.Setup(boMSB, cpolIdleLow, cphaFirstEdge, ClkDiv);
     ISpi.Enable();
     ISpi.EnableTxDma();
@@ -151,15 +151,9 @@ void Sound_t::Init() {
     WriteCmd(VS_REG_MODE, (VS_SM_DIFF | VS_ICONF_ADSDI | VS_SM_SDINEW));  // Normal mode
     WriteCmd(VS_REG_MIXERVOL, (VS_SMV_ACTIVE | VS_SMV_GAIN2));
     WriteCmd(VS_REG_RECCTRL, VS_SARC_DREQ512);
-    WriteCmd(VS_REG_VOL, 20 + 20*256);
-
-//    SetVolume(100);
+    SetVolume(234);
     chThdSleepMilliseconds(270);
-    AmplifierOn();
-
-    uint16_t Data = 0;
-    ReadCmd(VS_REG_MIXERVOL, &Data);
-    Printf("Data: %X\r", Data);
+//    AmplifierOn();
 
     // ==== Thread ====
     PThread = chThdCreateStatic(waSoundThread, sizeof(waSoundThread), NORMALPRIO, (tfunc_t)SoundThread, NULL);
@@ -170,10 +164,7 @@ void Sound_t::Shutdown() {
 }
 
 void Sound_t::IPlayNew() {
-//    AmplifierOn();
-//    WriteCmd(VS_REG_MODE, (VS_SM_DIFF | VS_ICONF_ADSDI | VS_SM_SDINEW));
-//    WriteCmd(VS_REG_VOL, ((IAttenuation * 256) + IAttenuation));
-
+    AmplifierOn();
     FRESULT rslt;
     // Open new file
     Printf("Play %S at %u\r", IFilename, IStartPosition);
@@ -213,7 +204,7 @@ void Sound_t::IPlayNew() {
 
 // ================================ Inner use ==================================
 void Sound_t::ISendNextData() {
-    Printf("ISendNextData\r");
+//    Printf("ISendNextData\r");
     dmaStreamDisable(VS_DMA);
     IDmaIdle = false;
     // ==== If command queue is not empty, send command ====
@@ -230,7 +221,7 @@ void Sound_t::ISendNextData() {
     // ==== Send next chunk of data if any ====
     switch(State) {
         case sndPlaying: {
-            Printf("  sndPlaying\r");
+//            Printf("  sndPlaying\r");
             // Switch buffer if required
             if(PBuf->DataSz == 0) {
                 PBuf = (PBuf == &Buf1)? &Buf2 : &Buf1;      // Switch to next buf
@@ -256,7 +247,7 @@ void Sound_t::ISendNextData() {
         } break;
 
         case sndWritingZeroes:
-            Printf("  sndWritingZeroes\r");
+//            Printf("  sndWritingZeroes\r");
             if(ZeroesCount == 0) { // Was writing zeroes, now all over
                 State = sndStopped;
                 IDmaIdle = true;
@@ -267,14 +258,14 @@ void Sound_t::ISendNextData() {
             break;
 
         case sndStopped:
-            Printf("  sndStopped\r");
+//            Printf("  sndStopped\r");
             if(!IDreq.IsHi()) IDreq.EnableIrq(IRQ_PRIO_MEDIUM);
             else IDmaIdle = true;
     } // switch
 }
 
 void Sound_t::PrepareToStop() {
-    Printf("Prepare\r");
+//    Printf("Prepare\r");
     State = sndWritingZeroes;
     ZeroesCount = ZERO_SEQ_LEN;
     if(IFile.obj.fs != 0) f_close(&IFile);
@@ -282,7 +273,6 @@ void Sound_t::PrepareToStop() {
 }
 
 void Sound_t::SendZeroes() {
-//    Uart.Printf("sz\r");
     XDCS_Lo();  // Start data transmission
     uint32_t FLength = (ZeroesCount > 512)? 512 : ZeroesCount;
     dmaStreamSetMemory0(VS_DMA, &SZero);
