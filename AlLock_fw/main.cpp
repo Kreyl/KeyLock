@@ -9,6 +9,8 @@
 #include "kl_fs_utils.h"
 #include "kl_i2c.h"
 #include "leds_pca.h"
+#include "vs.h"
+#include "media.h"
 //#include "battery_consts.h"
 
 #if 1 // =============== Low level ================
@@ -90,15 +92,12 @@ int main() {
     // Leds
     i2c1.Init();
     Pca9635.Init();
-//    Leds.SetColor(0, clBlue);
-//    Leds.SetColor(2, clBlue);
     LedA.Init();
     LedB.Init();
-    chSysLock();
-    LedA.SetColorI(clRed);
-    chSysUnlock();
 
-    LedB.StartOrRestart(lsqDoorOpening);
+    // Sound
+    Vs.Init();
+    ESnd.Init();
 
 //    TmrOneSecond.StartOrRestart();
 #endif

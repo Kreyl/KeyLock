@@ -54,6 +54,15 @@
 // LED controller
 #define LED_OE_PIN      GPIOA, 12
 
+// VS
+#define VS_XCS          GPIOA, 0
+#define VS_XDCS         GPIOA, 4
+#define VS_RST          GPIOA, 15
+#define VS_DREQ         GPIOA, 1
+#define VS_XCLK         GPIOA, 5
+#define VS_SO           GPIOA, 6
+#define VS_SI           GPIOA, 7
+
 // I2C
 #define I2C1_GPIO       GPIOB
 #define I2C1_SCL        6
@@ -83,6 +92,7 @@
 #endif // GPIO
 
 #if 1 // =========================== SPI =======================================
+#define VS_SPI          SPI1
 #endif
 
 #if 1 // =========================== I2C =======================================
@@ -129,6 +139,16 @@
 
 #define EXTUART_DMA_TX  STM32_DMA1_STREAM7
 #define EXTUART_DMA_RX  STM32_DMA1_STREAM6
+
+#define VS_DMA          STM32_DMA1_STREAM3
+#define VS_DMA_CHNL     0
+#define VS_DMA_MODE     STM32_DMA_CR_CHSEL(VS_DMA_CHNL) | \
+                        DMA_PRIORITY_LOW | \
+                        STM32_DMA_CR_MSIZE_BYTE | \
+                        STM32_DMA_CR_PSIZE_BYTE | \
+                        STM32_DMA_CR_DIR_M2P |    /* Direction is memory to peripheral */ \
+                        STM32_DMA_CR_TCIE         /* Enable Transmission Complete IRQ */
+
 
 // ==== I2C ====
 #define I2C1_DMA_TX     nullptr //STM32_DMA2_STREAM7
