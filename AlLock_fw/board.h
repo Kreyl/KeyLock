@@ -54,6 +54,9 @@
 // LED controller
 #define LED_OE_PIN      GPIOA, 12
 
+// Lasers
+#define LASER_ON_PIN    GPIOA, 11
+
 // VS
 #define VS_XCS          GPIOA, 0
 #define VS_XDCS         GPIOA, 4

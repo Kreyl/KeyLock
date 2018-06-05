@@ -22,7 +22,22 @@ const LedRGBChunk_t lsqDoorOpening[] = {
         {csWait, 207},
         {csGoto, 0}
 };
+const LedRGBChunk_t lsqDoorClosing[] = {
+        {csSetup, 0, clGreen},
+        {csWait, 207},
+        {csSetup, 0, clBlack},
+        {csWait, 207},
+        {csGoto, 0}
+};
 
+const LedRGBChunk_t lsqDoorOpen[] = {
+        {csSetup, 0, clGreen},
+        {csEnd}
+};
+const LedRGBChunk_t lsqDoorClosed[] = {
+        {csSetup, 0, clRed},
+        {csEnd}
+};
 
 const LedRGBChunk_t lsqError[] = {
         {csSetup, 0, clRed},

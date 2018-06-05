@@ -57,6 +57,26 @@ struct Codecheck_t {
     void Reset(void) { EnteredLength=0; EnterResult=entNA; memset(EnteredCode, 0, CODE_LNG_MAX); }
 } Codecheck;
 
+enum DoorState_t {dsClosed, dsOpened, dsOpening, dsClosing};
+class Door_t {
+private:
+    PinOutput_t IPin{LASER_ON_PIN, omPushPull};
+    static void EvtJustClosed();
+    static void EvtJustOpened();
+    void LasersOn () { IPin.SetLo(); }
+    void LasersOff() { IPin.SetHi(); }
+public:
+    TmrKL_t TmrClose {MS2ST(999), evtIdTimeToClose, tktOneShot};
+    void Init() {
+        IPin.Init();
+        EvtJustClosed();
+    }
+    DoorState_t State;
+    void Open();
+    void Close();
+} Door;
+
+ftVoidVoid EvtOnSndEnd = nullptr;
 //static TmrKL_t TmrOneSecond {MS2ST(999), evtIdEverySecond, tktPeriodic}; // Measure battery periodically
 #endif
 
@@ -101,6 +121,8 @@ int main() {
 //    TmrOneSecond.StartOrRestart();
 #endif
 
+    Door.Init();
+
     // ==== Main cycle ====
     ITask();
 }
@@ -121,21 +143,63 @@ void ITask() {
 //                if(Msg.BtnEvtInfo.BtnID == 2 and Msg.BtnEvtInfo.Type == beLongPress) {
 //                    PowerOff();
 //                }
-                break;
+//                break;
 
             case evtIdEverySecond:
 //                Printf("Second\r");
                 break;
 
+            case evtIdTimeToClose:
+                Door.Close();
+                break;
+
 
             case evtIdSoundEnd:
-                Printf("Sound end\r");
+//                Printf("Sound end\r");
+                if(EvtOnSndEnd != nullptr) EvtOnSndEnd();
                 break;
 
             default: break;
         } // switch
     } // while true
 }
+
+#if 1 // ================================ Door =================================
+void Door_t::Open(void) {
+    Door.State = dsOpening;
+    Sound.Play(Settings.SndOpen);
+    EvtOnSndEnd = EvtJustOpened;
+    TmrClose.StartOrRestart();
+    LedA.StartOrRestart(lsqDoorOpening);
+    LedB.StartOrRestart(lsqDoorOpening);
+}
+
+void Door_t::Close(void) {
+    Door.State = dsClosing;
+    Sound.Play(Settings.SndClose);
+    EvtOnSndEnd = EvtJustClosed;
+    TmrClose.Stop();
+    LedA.StartOrRestart(lsqDoorClosing);
+    LedB.StartOrRestart(lsqDoorClosing);
+}
+
+void Door_t::EvtJustClosed(void) {
+    EvtOnSndEnd = nullptr;
+    LedA.StartOrRestart(lsqDoorClosed);
+    LedB.StartOrRestart(lsqDoorClosed);
+    Door.LasersOn();
+    Door.State = dsClosed;
+    Printf("Door is closed\r");
+}
+void Door_t::EvtJustOpened(void) {
+    EvtOnSndEnd = nullptr;
+    Door.State = dsOpened;
+    LedA.StartOrRestart(lsqDoorOpen);
+    LedB.StartOrRestart(lsqDoorOpen);
+    Door.LasersOff();
+    Printf("Door is opened\r");
+}
+#endif
 
 uint8_t Settings_t::Read() {
     // Sound names
@@ -170,15 +234,9 @@ uint8_t Settings_t::Read() {
     // Complexity
     if(ini::ReadStringTo("lock.ini", "Code", "Complexity", Settings.Complexity, 3) != retvOk) return retvFail;
 
-    // Colors
-    if(ini::ReadColor("lock.ini", "Colors", "DoorOpen",    &Settings.ColorDoorOpen)    != retvOk) return retvFail;
-    if(ini::ReadColor("lock.ini", "Colors", "DoorOpening", &Settings.ColorDoorOpening) != retvOk) return retvFail;
-    if(ini::ReadColor("lock.ini", "Colors", "DoorClosed",  &Settings.ColorDoorClosed)  != retvOk) return retvFail;
-    if(ini::ReadColor("lock.ini", "Colors", "DoorClosing", &Settings.ColorDoorClosing) != retvOk) return retvFail;
-    if(ini::Read<uint32_t>("lock.ini", "Colors", "BlinkDelay", &Settings.BlinkDelay)   != retvOk) return retvFail;
-
     // Timings
     if(ini::Read<uint32_t>("lock.ini", "Timings", "DoorCloseDelay", &Settings.DoorCloseDelay) != retvOk) return retvFail;
+    Door.TmrClose.SetNewPeriod_ms(Settings.DoorCloseDelay);
     if(ini::Read<uint32_t>("lock.ini", "Timings", "KeyDropDelay",   &Settings.KeyDropDelay)   != retvOk) return retvFail;
 
     return retvOk;
@@ -194,6 +252,29 @@ void OnCmd(Shell_t *PShell) {
     else if(PCmd->NameIs("Version")) PShell->Printf("%S %S\r", APP_NAME, XSTRINGIFY(BUILD_TIME));
 
 //    else if(PCmd->NameIs("GetBat")) { PShell->Printf("Battery: %u\r", Audio.GetBatteryVmv()); }
+
+    // Codes
+    else if(PCmd->NameIs("State")) {    // Get state: "service code","CodeA","CodeB", "Complexity"
+        PShell->Printf("%S,%S,%S,%S\r\n", Settings.ServiceCode, Settings.CodeA, Settings.CodeB, Settings.Complexity);
+    }
+
+    // Door
+    else if(PCmd->NameIs("Open")) {
+        if(Door.State == dsClosed) {
+            Door.Open();
+            Door.TmrClose.StartOrRestart();
+            PShell->Printf("Door is opening\r\n");
+        }
+        else PShell->Printf("Door is open\r\n");
+    }
+    else if(PCmd->NameIs("Close")) {
+        if(Door.State == dsOpened) {
+            Door.Close();
+            PShell->Printf("Door is closing\r\n");
+        }
+        else PShell->Printf("Door is closed\r\n");
+    }
+
 
     else PShell->Ack(retvCmdUnknown);
 }
