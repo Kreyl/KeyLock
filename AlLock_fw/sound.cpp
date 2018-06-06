@@ -195,7 +195,13 @@ void Sound_t::IPlayNew() {
         return;
     }
     // Fill second buffer if needed
-    if(Buf1.DataSz == VS_DATA_BUF_SZ) Buf2.ReadFromFile(&IFile);
+    if(Buf1.DataSz == VS_DATA_BUF_SZ) {
+        if(Buf2.ReadFromFile(&IFile) != retvOk) {
+            Printf("Error reading Buf2\r");
+            Stop();
+            return;
+        }
+    }
 
     PBuf = &Buf1;
     State = sndPlaying;

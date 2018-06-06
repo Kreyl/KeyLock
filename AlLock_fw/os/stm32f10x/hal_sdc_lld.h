@@ -192,7 +192,7 @@
 
 #else /* !(defined(STM32F4XX) || defined(STM32F2XX)) */
 
-#define STM32_HCLK  48000000
+#define STM32_HCLK  4000000
 
 #define STM32_SDC_WRITE_TIMEOUT                                             \
   (((STM32_HCLK / (STM32_SDIO_DIV_HS + 2)) / 1000) *                        \

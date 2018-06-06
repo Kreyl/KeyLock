@@ -46,7 +46,7 @@
 /* This option switches f_mkfs() function. (0:Disable or 1:Enable) */
 
 
-#define _USE_FASTSEEK   1
+#define _USE_FASTSEEK   0
 /* This option switches fast seek function. (0:Disable or 1:Enable) */
 
 
@@ -101,7 +101,7 @@
 */
 
 
-#define    _USE_LFN    3
+#define    _USE_LFN    0
 #define    _MAX_LFN    128
 /* The _USE_LFN switches the support of long file name (LFN).
 /

@@ -28,33 +28,39 @@ CmdUart_t ExtUart {&ExtUartParams};
 LedPcaBlinker_t LedA(0), LedB(2);
 
 // ==== Settings ====
-#define FNAME_LNG_MAX   36
-#define CODE_LNG_MAX    6
+// File names
+#define SETTINGS_FNAME  "lock.cfg"
+#define SND_BTN_BEEP    "beep.wav"
+#define SND_BTN_DROP    "drop.wav"
+#define SND_CRASH       "sparks.wav"
+#define SND_ERROR       "error.wav"
+#define SND_OPEN        "open.wav"
+#define SND_CLOSE       "close.wav"
 
-static struct Settings_t {
-    char SndKeyBeep[FNAME_LNG_MAX], SndKeyDrop[FNAME_LNG_MAX], SndPassError[FNAME_LNG_MAX], SndOpen[FNAME_LNG_MAX];
-    char SndClose[FNAME_LNG_MAX], SndKeyCrash[FNAME_LNG_MAX];
+#define CODE_MAX_LEN    6  // 6 digits
+// If length == 0 then code is empty. If code is negative (-1 for examle) then side is crashed
+
+class Settings_t {
+public:
     // Codes
-    char CodeA[CODE_LNG_MAX+1], CodeB[CODE_LNG_MAX+1], ServiceCode[CODE_LNG_MAX+1]; // Because of trailing \0
-    int8_t CodeALength, CodeBLength;     // Length of 0 means empty, negative length means crash
-    char Complexity[4];
-    // Colors
-    Color_t ColorDoorOpen, ColorDoorOpening, ColorDoorClosed, ColorDoorClosing;
-    uint32_t BlinkDelay;
+    char CodeA[CODE_MAX_LEN+1], CodeB[CODE_MAX_LEN+1], CodeSrv[CODE_MAX_LEN+1]; // Because of trailing \0
+    int8_t CodeALen=0, CodeBLen=0, CodeSrvLen=0;     // Length of 0 means empty, negative length means crash
+    uint8_t Complexity;
     // Timings
-    uint32_t DoorCloseDelay, KeyDropDelay;
+    uint32_t DoorCloseDelay = 12006, KeyDropDelay = 2799;
     // Methods
-    uint8_t Read();
+    uint8_t Load();
+    uint8_t Save();
 } Settings;
 
 enum EntrResult_t {entNA, entError, entOpen};
 struct Codecheck_t {
     uint32_t Timer;
-    char EnteredCode[CODE_LNG_MAX+1];   // Because of trailing \0
+    char EnteredCode[CODE_MAX_LEN+1];   // Because of trailing \0
     uint8_t EnteredLength;
     EntrResult_t EnterResult;
     void Task(void);
-    void Reset(void) { EnteredLength=0; EnterResult=entNA; memset(EnteredCode, 0, CODE_LNG_MAX); }
+    void Reset(void) { EnteredLength=0; EnterResult=entNA; memset(EnteredCode, 0, CODE_MAX_LEN+1); }
 } Codecheck;
 
 enum DoorState_t {dsClosed, dsOpened, dsOpening, dsClosing};
@@ -83,7 +89,7 @@ ftVoidVoid EvtOnSndEnd = nullptr;
 int main() {
 #if 1 // Low level init
     // ==== Setup clock ====
-//    Clk.SetCoreClk(cclk12MHz);
+//    Clk.SetCoreClk(cclk48MHz);
     Clk.UpdateFreqValues();
 
     // ==== Init OS ====
@@ -101,7 +107,7 @@ int main() {
     ExtUart.StartRx();
 
     SD.Init();
-    if (Settings.Read() != retvOk) {
+    if (Settings.Load() != retvOk) {
         Printf("Settings read error\r");
         while(true);    // nothing to do if config not read
     }
@@ -167,7 +173,7 @@ void ITask() {
 #if 1 // ================================ Door =================================
 void Door_t::Open(void) {
     Door.State = dsOpening;
-    Sound.Play(Settings.SndOpen);
+    Sound.Play(SND_OPEN);
     EvtOnSndEnd = EvtJustOpened;
     TmrClose.StartOrRestart();
     LedA.StartOrRestart(lsqDoorOpening);
@@ -176,7 +182,7 @@ void Door_t::Open(void) {
 
 void Door_t::Close(void) {
     Door.State = dsClosing;
-    Sound.Play(Settings.SndClose);
+    Sound.Play(SND_CLOSE);
     EvtOnSndEnd = EvtJustClosed;
     TmrClose.Stop();
     LedA.StartOrRestart(lsqDoorClosing);
@@ -201,46 +207,60 @@ void Door_t::EvtJustOpened(void) {
 }
 #endif
 
-uint8_t Settings_t::Read() {
-    // Sound names
-    if(ini::ReadStringTo("lock.ini", "Sound", "KeyBeep",   Settings.SndKeyBeep,   FNAME_LNG_MAX) != retvOk) return retvFail;
-    if(ini::ReadStringTo("lock.ini", "Sound", "KeyDrop",   Settings.SndKeyDrop,   FNAME_LNG_MAX) != retvOk) return retvFail;
-    if(ini::ReadStringTo("lock.ini", "Sound", "KeyCrash",  Settings.SndKeyCrash,  FNAME_LNG_MAX) != retvOk) return retvFail;
-    if(ini::ReadStringTo("lock.ini", "Sound", "PassError", Settings.SndPassError, FNAME_LNG_MAX) != retvOk) return retvFail;
-    if(ini::ReadStringTo("lock.ini", "Sound", "Open",      Settings.SndOpen,      FNAME_LNG_MAX) != retvOk) return retvFail;
-    if(ini::ReadStringTo("lock.ini", "Sound", "Close",     Settings.SndClose,     FNAME_LNG_MAX) != retvOk) return retvFail;
-
-    // ======= Codes =======
-    // If length == 0 then code is empty. If code is negative (-1 for examle) then side is crashed
-    // === Code A ===
-    if(ini::ReadStringTo("lock.ini", "Code", "CodeA", Settings.CodeA, CODE_LNG_MAX) != retvOk) return retvFail;
-    Settings.CodeALength = strlen(Settings.CodeA);
-    if (Settings.CodeALength != 0) {
-        if (Settings.CodeA[0] == 'N') Settings.CodeALength = 0;     // Check if None
-        if (Settings.CodeA[0] == '-') Settings.CodeALength = -1;    // Check if crashed
+#if 1 // ============================== Settings ===============================
+uint8_t Settings_t::Load() {
+    if(csv::OpenFile(SETTINGS_FNAME) == retvOk) {
+        while(true) {
+            if(csv::ReadNextLine() != retvOk) break;
+            char *Name;
+            if(csv::GetNextToken(&Name) != retvOk) continue;
+            // Codes
+            if(csv::TryLoadString(Name, "CodeA", Settings.CodeA, CODE_MAX_LEN+1) == retvOk) {
+                Settings.CodeALen = strlen(Settings.CodeA);
+                if(Settings.CodeA[0] == 'N') Settings.CodeALen = 0;  // Check if None
+                if(Settings.CodeA[0] == '-') Settings.CodeALen = -1; // Check if crashed
+                continue;
+            }
+            if(csv::TryLoadString(Name, "CodeB", Settings.CodeB, CODE_MAX_LEN+1) == retvOk) {
+                Settings.CodeBLen = strlen(Settings.CodeB);
+                if(Settings.CodeB[0] == 'N') Settings.CodeBLen = 0;  // Check if None
+                if(Settings.CodeB[0] == '-') Settings.CodeBLen = -1; // Check if crashed
+                continue;
+            }
+            if(csv::TryLoadString(Name, "ServiceCode", Settings.CodeSrv, CODE_MAX_LEN+1) == retvOk) {
+                Settings.CodeSrvLen = strlen(Settings.CodeSrv);
+                continue;
+            }
+            // Complexity
+            csv::TryLoadParam<uint8_t>(Name, "Complexity", &Settings.Complexity);
+            // Timings
+            if(csv::TryLoadParam<uint32_t>(Name, "DoorCloseDelay", &Settings.DoorCloseDelay) == retvOk) {
+                Door.TmrClose.SetNewPeriod_ms(Settings.DoorCloseDelay);
+                continue;
+            }
+            csv::TryLoadParam<uint32_t>(Name, "KeyDropDelay", &Settings.KeyDropDelay);
+        } // while true
+        csv::CloseFile();
     }
-
-    // === Code B ===
-    if(ini::ReadStringTo("lock.ini", "Code", "CodeB", Settings.CodeB, CODE_LNG_MAX) != retvOk) return retvFail;
-    Settings.CodeBLength = strlen(Settings.CodeB);
-    if (Settings.CodeBLength !=0) {
-        if (Settings.CodeB[0] == 'N') Settings.CodeBLength = 0;     // Check if None
-        if (Settings.CodeB[0] == '-') Settings.CodeBLength = -1;    // Check if crashed
-    }
-
-    // === Service code ===
-    if(ini::ReadStringTo("lock.ini", "Code", "ServiceCode", Settings.ServiceCode, CODE_LNG_MAX) != retvOk) return retvFail;
-
-    // Complexity
-    if(ini::ReadStringTo("lock.ini", "Code", "Complexity", Settings.Complexity, 3) != retvOk) return retvFail;
-
-    // Timings
-    if(ini::Read<uint32_t>("lock.ini", "Timings", "DoorCloseDelay", &Settings.DoorCloseDelay) != retvOk) return retvFail;
-    Door.TmrClose.SetNewPeriod_ms(Settings.DoorCloseDelay);
-    if(ini::Read<uint32_t>("lock.ini", "Timings", "KeyDropDelay",   &Settings.KeyDropDelay)   != retvOk) return retvFail;
-
+    Printf("Settings loaded\r");
     return retvOk;
 }
+
+uint8_t Settings_t::Save() {
+    if(TryOpenFileRewrite(SETTINGS_FNAME, &CommonFile) == retvOk) {
+        // Profile indx
+        f_printf(&CommonFile, "CodeA = %S\r\n", Settings.CodeA);
+        f_printf(&CommonFile, "CodeB = %S\r\n", Settings.CodeB);
+        f_printf(&CommonFile, "ServiceCode = %S\r\n", Settings.CodeSrv);
+        f_printf(&CommonFile, "Complexity = %u\r\n", Settings.Complexity);
+        f_printf(&CommonFile, "DoorCloseDelay = %u\r\n", Settings.DoorCloseDelay);
+        f_printf(&CommonFile, "KeyDropDelay = %u\r\n", Settings.KeyDropDelay);
+        f_close(&CommonFile);
+        return retvOk;
+    }
+    else return retvFail;
+}
+#endif
 
 #if 1 // ======================= Command processing ============================
 void OnCmd(Shell_t *PShell) {
@@ -255,7 +275,71 @@ void OnCmd(Shell_t *PShell) {
 
     // Codes
     else if(PCmd->NameIs("State")) {    // Get state: "service code","CodeA","CodeB", "Complexity"
-        PShell->Printf("%S,%S,%S,%S\r\n", Settings.ServiceCode, Settings.CodeA, Settings.CodeB, Settings.Complexity);
+        PShell->Printf("%S,%S,%S,%S\r\n", Settings.CodeSrv, Settings.CodeA, Settings.CodeB, Settings.Complexity);
+    }
+
+    else if(PCmd->NameIs("SetCodeSrv")) {
+        char *S;
+        if(PCmd->GetNextString(&S) == retvOk) {
+            uint32_t Len = strlen(S);
+            if(Len <= CODE_MAX_LEN) {
+                if(Len == 0) Settings.CodeSrvLen = 0;
+                else {
+                    strcpy(Settings.CodeSrv, S);
+                    Settings.CodeSrvLen = Len;
+                    Settings.Save();
+                }
+                PShell->Printf("Code changed\r\n");
+            }
+            else {
+                PShell->Printf("Too long code\r\n");
+                return;
+            }
+        }
+    }
+
+    else if(PCmd->NameIs("SetCodeA")) {
+        char *S;
+        if(PCmd->GetNextString(&S) == retvOk) {
+            uint32_t Len = strlen(S);
+            if(Len <= CODE_MAX_LEN) {
+                if(Settings.CodeALen >= 0) { // editing is not allowed if side crashed
+                    if(Len == 0) Settings.CodeALen = 0;
+                    else {
+                        strcpy(Settings.CodeA, S);
+                        Settings.CodeALen = Len;
+                        Settings.Save();
+                    }
+                }
+                PShell->Printf("Code changed\r\n");
+            }
+            else {
+                PShell->Printf("Too long code\r\n");
+                return;
+            }
+        }
+    }
+
+    else if(PCmd->NameIs("SetCodeB")) {
+        char *S;
+        if(PCmd->GetNextString(&S) == retvOk) {
+            uint32_t Len = strlen(S);
+            if(Len <= CODE_MAX_LEN) {
+                if(Settings.CodeBLen >= 0) { // editing is not allowed if side crashed
+                    if(Len == 0) Settings.CodeBLen = 0;
+                    else {
+                        strcpy(Settings.CodeB, S);
+                        Settings.CodeBLen = Len;
+                        Settings.Save();
+                    }
+                }
+                PShell->Printf("Code changed\r\n");
+            }
+            else {
+                PShell->Printf("Too long code\r\n");
+                return;
+            }
+        }
     }
 
     // Door
@@ -275,7 +359,12 @@ void OnCmd(Shell_t *PShell) {
         else PShell->Printf("Door is closed\r\n");
     }
 
+    else if(PCmd->NameIs("?")) {
+        PShell->Printf("Commands:\r\nPing\r\nState\r\n"
+                "SetCodeSrv\r\nSetCodeA\r\nSetCodeB\r\n"
+                "Open\r\nClose\r\n");
+    }
 
-    else PShell->Ack(retvCmdUnknown);
+    else PShell->Printf("Bad command\r\n");
 }
 #endif

@@ -42,6 +42,7 @@ extern void SDSignalError();
 
 semaphore_t SemSD;
 
+// Returns true if failed, false if success
 bool SDRead(uint32_t startblk, uint8_t *buffer, uint32_t n) {
 //    PrintfC("%S\r", __FUNCTION__);
     bool Rslt = false;
