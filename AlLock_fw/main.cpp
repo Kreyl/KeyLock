@@ -10,6 +10,7 @@
 #include "kl_i2c.h"
 #include "leds_pca.h"
 #include "sound.h"
+#include "btns.h"
 //#include "battery_consts.h"
 
 #if 1 // =============== Low level ================
@@ -29,21 +30,25 @@ LedPcaBlinker_t LedA(0), LedB(2);
 
 // ==== Settings ====
 // File names
-#define SETTINGS_FNAME  "lock.cfg"
-#define SND_BTN_BEEP    "beep.wav"
-#define SND_BTN_DROP    "drop.wav"
-#define SND_CRASH       "sparks.wav"
-#define SND_ERROR       "error.wav"
-#define SND_OPEN        "open.wav"
-#define SND_CLOSE       "close.wav"
+#define SETTINGS_FNAME      "lock.cfg"
+#define SND_BTN_BEEP        "beep.wav"
+#define SND_BTN_DROP        "drop.wav"
+#define SND_CRASH           "sparks.wav"
+#define SND_ERROR           "error.wav"
+#define SND_OPEN            "open.wav"
+#define SND_CLOSE           "close.wav"
+// Master toys
+#define SND_ENTER_CODE      "entrcode.wav"
+#define SND_CODE_SAVED      "ncodesvd.wav"
+#define SND_EMPTY_SAVED     "ecodesvd.wav"
 
-#define CODE_MAX_LEN    6  // 6 digits
+#define CODE_MAX_LEN    36  // 6 digits
 // If length == 0 then code is empty. If code is negative (-1 for examle) then side is crashed
 
 class Settings_t {
 public:
-    // Codes
-    char CodeA[CODE_MAX_LEN+1], CodeB[CODE_MAX_LEN+1], CodeSrv[CODE_MAX_LEN+1]; // Because of trailing \0
+    // Codes (Len+1 because of trailing \0)
+    char CodeA[CODE_MAX_LEN+1], CodeB[CODE_MAX_LEN+1], CodeSrv[CODE_MAX_LEN+1], CodeMaster[CODE_MAX_LEN+1];
     int8_t CodeALen=0, CodeBLen=0, CodeSrvLen=0;     // Length of 0 means empty, negative length means crash
     uint8_t Complexity;
     // Timings
@@ -53,15 +58,17 @@ public:
     uint8_t Save();
 } Settings;
 
-enum EntrResult_t {entNA, entError, entOpen};
-struct Codecheck_t {
-    uint32_t Timer;
+struct ECode_t {
+    TmrKL_t Tmr {MS2ST(999), evtIdTimeToDrop, tktOneShot};
+    bool IsEnteringSideCode = false;
     char EnteredCode[CODE_MAX_LEN+1];   // Because of trailing \0
     uint8_t EnteredLength;
-    EntrResult_t EnterResult;
-    void Task(void);
-    void Reset(void) { EnteredLength=0; EnterResult=entNA; memset(EnteredCode, 0, CODE_MAX_LEN+1); }
-} Codecheck;
+    void Reset() {
+        EnteredLength=0;
+        memset(EnteredCode, 0, CODE_MAX_LEN+1);
+        Tmr.Stop();
+    }
+} ECode;
 
 enum DoorState_t {dsClosed, dsOpened, dsOpening, dsClosing};
 class Door_t {
@@ -83,7 +90,8 @@ public:
 } Door;
 
 ftVoidVoid EvtOnSndEnd = nullptr;
-//static TmrKL_t TmrOneSecond {MS2ST(999), evtIdEverySecond, tktPeriodic}; // Measure battery periodically
+void BtnHandler(uint8_t KeybrdSide, uint8_t Btn);
+
 #endif
 
 int main() {
@@ -106,6 +114,8 @@ int main() {
     ExtUart.Init();
     ExtUart.StartRx();
 
+    BtnsInit();
+
     SD.Init();
     if (Settings.Load() != retvOk) {
         Printf("Settings read error\r");
@@ -123,11 +133,10 @@ int main() {
     // Sound
     Sound.Init();
     Sound.Play("alive.wav");
-
-//    TmrOneSecond.StartOrRestart();
 #endif
 
     Door.Init();
+    ECode.Reset();
 
     // ==== Main cycle ====
     ITask();
@@ -144,12 +153,9 @@ void ITask() {
                 ((Shell_t*)Msg.Ptr)->SignalCmdProcessed();
                 break;
 
-//            case evtIdButtons:
-////                Printf("Btn: %u %u\r", Msg.BtnEvtInfo.BtnID, Msg.BtnEvtInfo.Type);
-//                if(Msg.BtnEvtInfo.BtnID == 2 and Msg.BtnEvtInfo.Type == beLongPress) {
-//                    PowerOff();
-//                }
-//                break;
+            case evtIdButtons:
+                BtnHandler(Msg.ValueID, Msg.Value);
+                break;
 
             case evtIdEverySecond:
 //                Printf("Second\r");
@@ -165,9 +171,105 @@ void ITask() {
                 if(EvtOnSndEnd != nullptr) EvtOnSndEnd();
                 break;
 
+            case evtIdTimeToDrop:
+                ECode.Reset();
+                ECode.IsEnteringSideCode = false;
+                Sound.Play(SND_BTN_DROP);
+                break;
+
             default: break;
         } // switch
     } // while true
+}
+
+void BtnHandler(uint8_t KeybrdSide, uint8_t Btn) {
+    Printf("Side: %u; Btn: %u\r", KeybrdSide, Btn);
+    // Do not react if door is opening or closing
+    if(Door.State == dsOpening or Door.State == dsClosing) return;
+
+    int8_t CodeLen = (KeybrdSide == KBD_SIDE_A)? Settings.CodeALen : Settings.CodeBLen;
+    char* Code = (KeybrdSide == KBD_SIDE_A)? Settings.CodeA : Settings.CodeB;
+    // Check if side is crashed
+    if(CodeLen < 0) {
+        Sound.Play(SND_CRASH);
+        return;
+    }
+
+    if((Btn >= 0) and (Btn <= 9)) { // Digit entered
+        Sound.Play(SND_BTN_BEEP);   // Play sound always
+        ECode.Tmr.StartOrRestart();
+        // Add digit to entered string
+        if(ECode.EnteredLength <= CODE_MAX_LEN) {
+            ECode.EnteredCode[ECode.EnteredLength++] = '0' + Btn;
+        }
+    }
+    // None-digit entered
+    else {
+        if(Btn == BTN_STAR) {   // Drop code
+            ECode.IsEnteringSideCode = false;
+            Sound.Play(SND_BTN_DROP);
+        }
+
+        else if(Btn == BTN_HASH) {
+            // Close door if open
+            if(Door.State == dsOpened) Door.Close();
+            // Check ahead if door closed
+            else if(Door.State == dsClosed) {
+                // Complete entering code by master
+                if(ECode.IsEnteringSideCode) {
+                    ECode.IsEnteringSideCode = false;
+                    if(KeybrdSide == KBD_SIDE_A) {
+                        if(ECode.EnteredLength == 0) {  // Empty code
+                            Settings.CodeALen = 0;
+                            Settings.CodeA[0] = 0;  // Empty string
+                            Settings.Save();
+                            Sound.Play(SND_EMPTY_SAVED);
+                        }
+                        else { // Not empty code
+                            Settings.CodeALen = strlen(ECode.EnteredCode);
+                            strcpy(Settings.CodeA, ECode.EnteredCode);
+                            Settings.Save();
+                            Sound.Play(SND_CODE_SAVED);
+                        }
+                    }
+                    else { // Side B
+                        if(ECode.EnteredLength == 0) {  // Empty code
+                            Settings.CodeBLen = 0;
+                            Settings.CodeB[0] = 0;  // Empty string
+                            Settings.Save();
+                            Sound.Play(SND_EMPTY_SAVED);
+                        }
+                        else { // Not empty code
+                            Settings.CodeBLen = strlen(ECode.EnteredCode);
+                            strcpy(Settings.CodeB, ECode.EnteredCode);
+                            Settings.Save();
+                            Sound.Play(SND_CODE_SAVED);
+                        }
+                    } // side
+                } // Complete entering code by master
+                // Not entering master code
+                else {
+                    // Check if master code
+                    if(strcmp(ECode.EnteredCode, Settings.CodeMaster) == 0) {
+                        Sound.Play(SND_ENTER_CODE);
+                        ECode.IsEnteringSideCode = true;
+                    }
+                    // Not master code
+                    else {
+                        // Check if side code is empty
+                        if(CodeLen == 0) Door.Open();
+                        // Not empty, check code
+                        else {
+                            if(strcmp(ECode.EnteredCode, Code) == 0) Door.Open();
+                            else Sound.Play(SND_ERROR); // error
+                        }
+                    } // Not master code
+                } // Not entering master code
+            } // if door closed
+        } // if hash
+        // Reset ECode, be it star or hash
+        ECode.Reset();
+    } // if digit
 }
 
 #if 1 // ================================ Door =================================
@@ -231,6 +333,9 @@ uint8_t Settings_t::Load() {
                 Settings.CodeSrvLen = strlen(Settings.CodeSrv);
                 continue;
             }
+            if(csv::TryLoadString(Name, "MasterCode", Settings.CodeMaster, CODE_MAX_LEN+1) == retvOk) {
+                continue;
+            }
             // Complexity
             csv::TryLoadParam<uint8_t>(Name, "Complexity", &Settings.Complexity);
             // Timings
@@ -238,7 +343,10 @@ uint8_t Settings_t::Load() {
                 Door.TmrClose.SetNewPeriod_ms(Settings.DoorCloseDelay);
                 continue;
             }
-            csv::TryLoadParam<uint32_t>(Name, "KeyDropDelay", &Settings.KeyDropDelay);
+            if(csv::TryLoadParam<uint32_t>(Name, "KeyDropDelay", &Settings.KeyDropDelay) == retvOk) {
+                ECode.Tmr.SetNewPeriod_ms(Settings.KeyDropDelay);
+                continue;
+            }
         } // while true
         csv::CloseFile();
     }
@@ -248,13 +356,13 @@ uint8_t Settings_t::Load() {
 
 uint8_t Settings_t::Save() {
     if(TryOpenFileRewrite(SETTINGS_FNAME, &CommonFile) == retvOk) {
-        // Profile indx
         f_printf(&CommonFile, "CodeA = %S\r\n", Settings.CodeA);
         f_printf(&CommonFile, "CodeB = %S\r\n", Settings.CodeB);
         f_printf(&CommonFile, "ServiceCode = %S\r\n", Settings.CodeSrv);
         f_printf(&CommonFile, "Complexity = %u\r\n", Settings.Complexity);
         f_printf(&CommonFile, "DoorCloseDelay = %u\r\n", Settings.DoorCloseDelay);
         f_printf(&CommonFile, "KeyDropDelay = %u\r\n", Settings.KeyDropDelay);
+        f_printf(&CommonFile, "MasterCode = %S\r\n", Settings.CodeMaster);
         f_close(&CommonFile);
         return retvOk;
     }

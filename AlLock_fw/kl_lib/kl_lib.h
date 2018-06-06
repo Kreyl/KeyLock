@@ -638,12 +638,38 @@ static void PinClockEnable(const GPIO_TypeDef *PGpioPort) {
 }
 
 // ==== Fast setup ====
-#ifndef STM32F1XX
+#if defined STM32F1XX
+static inline void PinSetupModeOut(GPIO_TypeDef *PGpioPort, const uint16_t APinNumber, const PinOutMode_t PinOutMode) {
+    uint32_t CnfMode = ((uint32_t)PinOutMode << 2) | (uint32_t)PIN_SPEED_DEFAULT;
+    if(APinNumber < 8) {
+        uint8_t Offset = APinNumber*4;
+        PGpioPort->CRL &= ~((uint32_t)(0b1111 << Offset));  // Clear both mode and cnf
+        PGpioPort->CRL |= CnfMode << Offset;
+    }
+    else {
+        uint8_t Offset = (APinNumber - 8) * 4;
+        PGpioPort->CRH &= ~((uint32_t)(0b1111 << Offset));  // Clear both mode and cnf
+        PGpioPort->CRH |= CnfMode << Offset;
+    }
+}
+
+static inline void PinSetupModeAnalog(GPIO_TypeDef *PGpioPort, const uint16_t APinNumber) {
+    if(APinNumber < 8) {
+        uint8_t Offset = APinNumber*4;
+        PGpioPort->CRL &= ~((uint32_t)(0b1111 << Offset));  // Clear both mode and cnf
+    }
+    else {
+        uint8_t Offset = (APinNumber - 8) * 4;
+        PGpioPort->CRH &= ~((uint32_t)(0b1111 << Offset));  // Clear both mode and cnf
+    }
+}
+#else
 static inline void PinSetupModeOut(GPIO_TypeDef *PGpioPort, const uint16_t APinNumber) {
     uint8_t Offset = APinNumber*2;
     PGpioPort->MODER &= ~(0b11 << Offset);  // clear previous bits
     PGpioPort->MODER |=   0b01 << Offset;   // Set new bits
 }
+
 static inline void PinSetupModeAnalog(GPIO_TypeDef *PGpioPort, const uint16_t APinNumber) {
     PGpioPort->MODER |= 0b11 << (APinNumber*2);
 }

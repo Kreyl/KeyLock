@@ -39,8 +39,18 @@
 #define INDIVIDUAL_EXTI_IRQ_REQUIRED    FALSE
 
 // Buttons
-//#define BTN1_PIN        GPIOA, 0, pudPullDown
-//#define BTN2_PIN        GPIOA, 1, pudPullDown
+#define BTNS_GPIO       GPIOB
+#define BTN_A1_PIN      1
+#define BTN_A2_PIN      2
+#define BTN_A3_PIN      10
+#define BTN_B1_PIN      3
+#define BTN_B2_PIN      4
+#define BTN_B3_PIN      5
+#define BTN_4_PIN       11
+#define BTN_5_PIN       12
+#define BTN_6_PIN       13
+#define BTN_7_PIN       14
+
 
 // UART
 #define UART_GPIO       GPIOA

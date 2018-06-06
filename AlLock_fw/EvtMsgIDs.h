@@ -14,8 +14,8 @@ enum EvtMsgId_t {
     evtIdShellCmd,
     evtIdEverySecond,
 
-
     evtIdTimeToClose,
     evtIdSoundEnd,
-
+    evtIdButtons,
+    evtIdTimeToDrop
 };
