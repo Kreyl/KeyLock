@@ -16,14 +16,14 @@ const LedRGBChunk_t lsqIdle[] = {
 };
 
 const LedRGBChunk_t lsqDoorOpening[] = {
-        {csSetup, 0, clGreen},
+        {csSetup, 0, clYellow},
         {csWait, 207},
         {csSetup, 0, clBlack},
         {csWait, 207},
         {csGoto, 0}
 };
 const LedRGBChunk_t lsqDoorClosing[] = {
-        {csSetup, 0, clGreen},
+        {csSetup, 0, clYellow},
         {csWait, 207},
         {csSetup, 0, clBlack},
         {csWait, 207},
@@ -44,6 +44,14 @@ const LedRGBChunk_t lsqError[] = {
         {csWait, 99},
         {csSetup, 0, clBlack},
         {csWait, 99},
+        {csGoto, 0}
+};
+
+const LedRGBChunk_t lsqBatteryDischarged[] = {
+        {csSetup, 0, clRed},
+        {csWait, 207},
+        {csSetup, 0, clBlack},
+        {csWait, 207},
         {csGoto, 0}
 };
 

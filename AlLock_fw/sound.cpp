@@ -67,11 +67,6 @@ void Sound_t::ITask() {
                 else IDreq.EnableIrq(IRQ_PRIO_MEDIUM); // Enable dreq irq
                 break;
 
-            case VSMSG_COMPLETED:
-                AmplifierOff();    // switch off the amplifier to save energy
-                EvtQMain.SendNowOrExit(EvtMsg_t(evtIdSoundEnd));
-                break;
-
             case VSMSG_READ_NEXT: {
                 FRESULT rslt = FR_OK;
                 bool Eof = f_eof(&IFile);
@@ -147,10 +142,52 @@ void Sound_t::Init() {
 
 void Sound_t::Play(const char* AFilename, uint32_t StartPosition) {
     if(State == sndPlaying) Stop();
-    IFilename = AFilename;
     if(StartPosition & 1) StartPosition--;
-    IStartPosition = StartPosition;
-    IPlayNew();
+    FRESULT rslt;
+    // Open new file
+    Printf("Play %S at %u\r", AFilename, StartPosition);
+    rslt = f_open(&IFile, AFilename, FA_READ+FA_OPEN_EXISTING);
+    if (rslt != FR_OK) {
+        if (rslt == FR_NO_FILE) Printf("%S: not found\r", AFilename);
+        else Printf("OpenFile error: %u\r", rslt);
+        Stop();
+        return;
+    }
+    // Check if zero file
+    if (IFile.obj.objsize == 0) {
+        f_close(&IFile);
+        Printf("Empty file\r");
+        Stop();
+        return;
+    }
+    // Fast forward to start position if not zero
+    if(StartPosition != 0) {
+        if(StartPosition < IFile.obj.objsize) f_lseek(&IFile, StartPosition);
+    }
+
+    // Initially, fill both buffers
+    if(Buf1.ReadFromFile(&IFile) != retvOk) {
+        Printf("Error reading Buf1\r");
+        Stop();
+        return;
+    }
+    // Fill second buffer if needed
+    if(Buf1.DataSz == VS_DATA_BUF_SZ) {
+        if(Buf2.ReadFromFile(&IFile) != retvOk) {
+            Printf("Error reading Buf2\r");
+            Stop();
+            return;
+        }
+    }
+
+    WriteCmd(VS_REG_MODE, (VS_SM_DIFF | VS_ICONF_ADSDI | VS_SM_SDINEW));  // Normal mode
+    WriteCmd(VS_REG_MIXERVOL, (VS_SMV_ACTIVE | VS_SMV_GAIN2));
+    WriteCmd(VS_REG_RECCTRL, VS_SARC_DREQ512);
+    AmplifierOn();
+
+    PBuf = &Buf1;
+    State = sndPlaying;
+    StartTransmissionIfNotBusy();
 }
 
 void Sound_t::Shutdown() {
@@ -180,55 +217,6 @@ void Sound_t::Stop() {
     IDmaIdle = true;
 }
 
-void Sound_t::IPlayNew() {
-    FRESULT rslt;
-    // Open new file
-    Printf("Play %S at %u\r", IFilename, IStartPosition);
-    rslt = f_open(&IFile, IFilename, FA_READ+FA_OPEN_EXISTING);
-    IFilename = NULL;
-    if (rslt != FR_OK) {
-        if (rslt == FR_NO_FILE) Printf("%S: not found\r", IFilename);
-        else Printf("OpenFile error: %u\r", rslt);
-        Stop();
-        return;
-    }
-    // Check if zero file
-    if (IFile.obj.objsize == 0) {
-        f_close(&IFile);
-        Printf("Empty file\r");
-        Stop();
-        return;
-    }
-    // Fast forward to start position if not zero
-    if(IStartPosition != 0) {
-        if(IStartPosition < IFile.obj.objsize) f_lseek(&IFile, IStartPosition);
-    }
-
-    // Initially, fill both buffers
-    if(Buf1.ReadFromFile(&IFile) != retvOk) {
-        Printf("Error reading Buf1\r");
-        Stop();
-        return;
-    }
-    // Fill second buffer if needed
-    if(Buf1.DataSz == VS_DATA_BUF_SZ) {
-        if(Buf2.ReadFromFile(&IFile) != retvOk) {
-            Printf("Error reading Buf2\r");
-            Stop();
-            return;
-        }
-    }
-
-    WriteCmd(VS_REG_MODE, (VS_SM_DIFF | VS_ICONF_ADSDI | VS_SM_SDINEW));  // Normal mode
-    WriteCmd(VS_REG_MIXERVOL, (VS_SMV_ACTIVE | VS_SMV_GAIN2));
-    WriteCmd(VS_REG_RECCTRL, VS_SARC_DREQ512);
-    AmplifierOn();
-
-    PBuf = &Buf1;
-    State = sndPlaying;
-    StartTransmissionIfNotBusy();
-}
-
 // ================================ Inner use ==================================
 void Sound_t::ISendNextData() {
     dmaStreamDisable(VS_DMA);
@@ -241,6 +229,7 @@ void Sound_t::ISendNextData() {
                 if(PBuf->DataSz == 0) { // Previous attempt to read the file failed
                     IDmaIdle = true;
                     Stop();
+                    EvtQMain.SendNowOrExit(EvtMsg_t(evtIdSoundEnd));
                     break;
                 }
                 else EvtQVs.SendNowOrExit(VsMsg_t(VSMSG_READ_NEXT));

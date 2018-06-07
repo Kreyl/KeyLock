@@ -158,21 +158,11 @@ void ITask() {
                 ((Shell_t*)Msg.Ptr)->SignalCmdProcessed();
                 break;
 
-            case evtIdButtons:
-                BtnHandler(Msg.ValueID, Msg.Value);
-                break;
+            case evtIdButtons: BtnHandler(Msg.ValueID, Msg.Value); break;
 
-            case evtIdEverySecond:
-//                Printf("Second\r");
-                break;
-
-            case evtIdTimeToClose:
-                Door.Close();
-                break;
-
+            case evtIdTimeToClose: Door.Close(); break;
 
             case evtIdSoundEnd:
-//                Printf("Sound end\r");
                 if(EvtOnSndEnd != nullptr) EvtOnSndEnd();
                 break;
 
@@ -183,7 +173,11 @@ void ITask() {
                 break;
 
             case evtIdAdcRslt:
-                Printf("Battery: %u mv\r", Msg.Value);
+//                Printf("Battery: %u mv\r", Msg.Value);
+                // If battery discharged, indicate it
+                if(Door.State == dsClosed and Msg.Value < 2700) {
+                    LedA.StartOrContinue(lsqBatteryDischarged);
+                }
                 break;
 
             default: break;

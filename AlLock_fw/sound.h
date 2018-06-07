@@ -49,8 +49,7 @@ union VsMsg_t {
 
 #define VSMSG_DREQ_IRQ          1
 #define VSMSG_DMA_DONE          2
-#define VSMSG_COMPLETED         3
-#define VSMSG_READ_NEXT         4
+#define VSMSG_READ_NEXT         3
 
 extern EvtMsgQ_t<VsMsg_t, MAIN_EVT_Q_LEN> EvtQVs;
 
@@ -72,8 +71,6 @@ private:
     VsBuf_t Buf1, Buf2, *PBuf;
     FIL IFile;
     bool IDmaIdle;
-    const char* IFilename;
-    uint32_t IStartPosition;
     // Pin operations
     inline void Rst_Lo()   { PinSetLo(VS_RST); }
     inline void Rst_Hi()   { PinSetHi(VS_RST); }
@@ -92,7 +89,6 @@ private:
         }
         chSysUnlock();
     }
-    void IPlayNew();
 public:
     sndState_t State;
     void Init();
