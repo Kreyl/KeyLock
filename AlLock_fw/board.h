@@ -36,6 +36,10 @@
 
 #define BAT_MEAS_PIN    GPIOC, 0
 
+// Coils
+#define COIL_A_SETUP    {GPIOB, 8, TIM4, 3, invNotInverted, omPushPull, 7}
+#define COIL_B_SETUP    {GPIOB, 9, TIM4, 4, invNotInverted, omPushPull, 7}
+
 // Buttons
 #define BTNS_GPIO       GPIOB
 #define BTN_A1_PIN      1

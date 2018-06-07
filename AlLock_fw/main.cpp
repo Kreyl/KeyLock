@@ -90,6 +90,9 @@ public:
     void Close();
 } Door;
 
+PinOutputPWM_t CoilA(COIL_A_SETUP);
+PinOutputPWM_t CoilB(COIL_B_SETUP);
+
 ftVoidVoid EvtOnSndEnd = nullptr;
 void BtnHandler(uint8_t KeybrdSide, uint8_t Btn);
 #endif
@@ -114,6 +117,8 @@ int main() {
     ExtUart.StartRx();
 
     BtnsInit();
+//    CoilA.Init();
+//    CoilB.Init();
 
     // Leds
     i2c1.Init();
