@@ -15,7 +15,8 @@
 #define VS_SMV_GAIN2    (25 << 5)     // Gain2 = 0 db, others muted
 
 // VS_REG_RECCTRL
-#define VS_SARC_DREQ512 0x0100  // DREQ needs 512 byte space to turn on
+#define VS_SARC_DREQ512     0x0100  // DREQ needs 512 byte space to turn on
+#define VS_SARC_OUTOFADPCM  0x0080  // current ADPCM playback is canceled
 #endif
 
 Sound_t Sound;
@@ -35,6 +36,7 @@ void Sound_t::IIrqHandler() {
 extern "C"
 void SIrqDmaHandler(void *p, uint32_t flags) {
     chSysLockFromISR();
+    dmaStreamDisable(VS_DMA);
     EvtQVs.SendNowOrExitI(VsMsg_t(VSMSG_DMA_DONE));
     chSysUnlockFromISR();
 }
@@ -52,10 +54,10 @@ void Sound_t::ITask() {
     while(true) {
         VsMsg_t Msg = EvtQVs.Fetch(TIME_INFINITE);
         switch(Msg.ID) {
-            case VSMSG_STOP:
-//                Printf("Stop\r");
-                PrepareToStop();
-                break;
+//            case VSMSG_STOP:
+////                Printf("Stop\r");
+//                PrepareToStop();
+//                break;
 
             case VSMSG_DREQ_IRQ:
 //                Printf("Dreq\r");
@@ -65,8 +67,7 @@ void Sound_t::ITask() {
 
             case VSMSG_DMA_DONE:
 //                Printf("DmaDone\r");
-                ISpi.WaitBsyHi2Lo();                   // Wait SPI transaction end
-                if(Clk.AHBFreqHz > 12000000) DelayLoop(450); // Make a solemn pause
+                ISpi.WaitBsyHi2Lo();                // Wait SPI transaction end
                 XCS_Hi();                           // }
                 XDCS_Hi();                          // } Stop SPI
                 // Send next data if VS is ready
@@ -77,11 +78,11 @@ void Sound_t::ITask() {
             case VSMSG_COMPLETED:
 //                Printf("Completed\r");
 //                WriteCmd(VS_REG_MODE, 0x0004);    // Soft reset
-                if(IFilename != NULL) IPlayNew();
-                else {
+//                if(IFilename != NULL) IPlayNew();
+//                else {
                     AmplifierOff();    // switch off the amplifier to save energy
                     EvtQMain.SendNowOrExit(EvtMsg_t(evtIdSoundEnd));
-                }
+//                }
                 break;
 
             case VSMSG_READ_NEXT: {
@@ -159,12 +160,44 @@ void Sound_t::Init() {
     PThread = chThdCreateStatic(waSoundThread, sizeof(waSoundThread), NORMALPRIO, (tfunc_t)SoundThread, NULL);
 }
 
+void Sound_t::Play(const char* AFilename, uint32_t StartPosition) {
+    if(State == sndPlaying) StopNow();
+    IFilename = AFilename;
+    if(StartPosition & 1) StartPosition--;
+    IStartPosition = StartPosition;
+//        EvtQVs.SendNowOrExit(VsMsg_t(VSMSG_STOP));
+    IPlayNew();
+}
+
 void Sound_t::Shutdown() {
     Rst_Lo();           // enter shutdown mode
 }
 
+
+#define VS_TIMEOUT              8000000
+void Sound_t::StopNow() {
+    dmaWaitCompletion(VS_DMA);
+    dmaStreamDisable(VS_DMA);
+    AmplifierOff();
+    WriteCmd(VS_REG_RECCTRL, VS_SARC_OUTOFADPCM | VS_SARC_DREQ512);
+    f_close(&IFile);
+
+    volatile uint32_t Timeout = VS_TIMEOUT;
+    IDreq.DisableIrq();
+    while(!IDreq.IsHi()) {
+        Timeout--;
+        if(Timeout == 0) break;
+    }
+    ISpi.WaitBsyHi2Lo();
+    XDCS_Lo();
+    for (uint32_t i=0; i<11; i++) ISpi.ReadWriteByte(0);
+    XDCS_Hi();
+
+    State = sndStopped;
+    IDmaIdle = true;
+}
+
 void Sound_t::IPlayNew() {
-    AmplifierOn();
     FRESULT rslt;
     // Open new file
     Printf("Play %S at %u\r", IFilename, IStartPosition);
@@ -203,6 +236,11 @@ void Sound_t::IPlayNew() {
         }
     }
 
+    WriteCmd(VS_REG_MODE, (VS_SM_DIFF | VS_ICONF_ADSDI | VS_SM_SDINEW));  // Normal mode
+    WriteCmd(VS_REG_MIXERVOL, (VS_SMV_ACTIVE | VS_SMV_GAIN2));
+    WriteCmd(VS_REG_RECCTRL, VS_SARC_DREQ512);
+    AmplifierOn();
+
     PBuf = &Buf1;
     State = sndPlaying;
     StartTransmissionIfNotBusy();
@@ -234,7 +272,8 @@ void Sound_t::ISendNextData() {
 //                Uart.Printf("\rB=%u; Sz=%u", ((PBuf == &Buf1)? 1 : 2), PBuf->DataSz);
                 if(PBuf->DataSz == 0) { // Previous attempt to read the file failed
                     IDmaIdle = true;
-                    PrepareToStop();
+//                    PrepareToStop();
+                    StopNow();
                     break;
                 }
                 else EvtQVs.SendNowOrExit(VsMsg_t(VSMSG_READ_NEXT));
@@ -252,16 +291,16 @@ void Sound_t::ISendNextData() {
             PBuf->PData += FLength;
         } break;
 
-        case sndWritingZeroes:
-//            Printf("  sndWritingZeroes\r");
-            if(ZeroesCount == 0) { // Was writing zeroes, now all over
-                State = sndStopped;
-                IDmaIdle = true;
-//                Uart.Printf("\rvEnd");
-                EvtQVs.SendNowOrExit(VsMsg_t(VSMSG_COMPLETED));
-            }
-            else SendZeroes();
-            break;
+//        case sndWritingZeroes:
+////            Printf("  sndWritingZeroes\r");
+//            if(ZeroesCount == 0) { // Was writing zeroes, now all over
+//                State = sndStopped;
+//                IDmaIdle = true;
+////                Uart.Printf("\rvEnd");
+//                EvtQVs.SendNowOrExit(VsMsg_t(VSMSG_COMPLETED));
+//            }
+//            else SendZeroes();
+//            break;
 
         case sndStopped:
 //            Printf("  sndStopped\r");
@@ -270,23 +309,25 @@ void Sound_t::ISendNextData() {
     } // switch
 }
 
-void Sound_t::PrepareToStop() {
-//    Printf("Prepare\r");
-    State = sndWritingZeroes;
-    ZeroesCount = ZERO_SEQ_LEN;
-    if(IFile.obj.fs != 0) f_close(&IFile);
-    StartTransmissionIfNotBusy();
-}
+//void Sound_t::PrepareToStop() {
+////    dmaStreamDisable(VS_DMA);
+////    WriteCmd(VS_REG_RECCTRL, VS_SARC_OUTOFADPCM | VS_SARC_DREQ512);
+//    State = sndWritingZeroes;
+//    ZeroesCount = ZERO_SEQ_LEN;
+//    if(IFile.obj.fs != 0) f_close(&IFile);
+//    StartTransmissionIfNotBusy();
+//}
 
-void Sound_t::SendZeroes() {
-    XDCS_Lo();  // Start data transmission
-    uint32_t FLength = (ZeroesCount > 512)? 512 : ZeroesCount;
-    dmaStreamSetMemory0(VS_DMA, &SZero);
-    dmaStreamSetTransactionSize(VS_DMA, FLength);
-    dmaStreamSetMode(VS_DMA, VS_DMA_MODE);  // Do not increase memory pointer
-    dmaStreamEnable(VS_DMA);
-    ZeroesCount -= FLength;
-}
+//void Sound_t::SendZeroes() {
+//    dmaStreamDisable(VS_DMA);
+//    XDCS_Lo();  // Start data transmission
+//    uint32_t FLength = (ZeroesCount > 512)? 512 : ZeroesCount;
+//    dmaStreamSetMemory0(VS_DMA, &SZero);
+//    dmaStreamSetTransactionSize(VS_DMA, FLength);
+//    dmaStreamSetMode(VS_DMA, VS_DMA_MODE);  // Do not increase memory pointer
+//    dmaStreamEnable(VS_DMA);
+//    ZeroesCount -= FLength;
+//}
 
 // ==== Commands ====
 uint8_t Sound_t::ReadCmd(uint8_t AAddr, uint16_t* AData) {

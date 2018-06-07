@@ -183,7 +183,7 @@ void ITask() {
 }
 
 void BtnHandler(uint8_t KeybrdSide, uint8_t Btn) {
-    Printf("Side: %u; Btn: %u\r", KeybrdSide, Btn);
+//    Printf("Side: %u; Btn: %u\r", KeybrdSide, Btn);
     // Do not react if door is opening or closing
     if(Door.State == dsOpening or Door.State == dsClosing) return;
 

@@ -35,7 +35,7 @@
 
 #define VS_MAX_SPI_BAUDRATE_HZ  3400000
 
-enum sndState_t {sndStopped, sndPlaying, sndWritingZeroes};
+enum sndState_t {sndStopped, sndPlaying};//, sndWritingZeroes};
 
 union VsMsg_t {
     uint8_t ID;
@@ -47,7 +47,7 @@ union VsMsg_t {
     VsMsg_t(uint8_t AID) : ID(AID) {}
 } __attribute__((__packed__));
 
-#define VSMSG_STOP              1
+//#define VSMSG_STOP              1
 #define VSMSG_DREQ_IRQ          2
 #define VSMSG_DMA_DONE          3
 #define VSMSG_COMPLETED         4
@@ -103,22 +103,19 @@ private:
         }
         chSysUnlock();
     }
-    void PrepareToStop();
-    void SendZeroes();
+//    void PrepareToStop();
+//    void SendZeroes();
     void IPlayNew();
+    void StopNow();
 public:
     sndState_t State;
     void Init();
     void Shutdown();
-    void Play(const char* AFilename, uint32_t StartPosition = 0) {
-        IFilename = AFilename;
-        if(StartPosition & 1) StartPosition--;
-        IStartPosition = StartPosition;
-        EvtQVs.SendNowOrExit(VsMsg_t(VSMSG_STOP));
-    }
+    void Play(const char* AFilename, uint32_t StartPosition = 0);
     void Stop() {
-        IFilename = NULL;
-        EvtQVs.SendNowOrExit(VsMsg_t(VSMSG_STOP));
+        StopNow();
+//        IFilename = NULL;
+//        EvtQVs.SendNowOrExit(VsMsg_t(VSMSG_STOP));
     }
     void AmplifierOn();
     void AmplifierOff();
