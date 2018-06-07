@@ -41,9 +41,10 @@ const LedRGBChunk_t lsqDoorClosed[] = {
 
 const LedRGBChunk_t lsqError[] = {
         {csSetup, 0, clRed},
-        {csWait, 4005},
+        {csWait, 99},
         {csSetup, 0, clBlack},
-        {csEnd}
+        {csWait, 99},
+        {csGoto, 0}
 };
 
 #endif

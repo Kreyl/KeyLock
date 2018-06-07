@@ -26,17 +26,15 @@
 
 //  Periphery
 #define I2C1_ENABLED            TRUE
-#define I2C2_ENABLED            FALSE
-#define I2C3_ENABLED            FALSE
-#define SIMPLESENSORS_ENABLED   FALSE
-#define BUTTONS_ENABLED         FALSE
 
-#define ADC_REQUIRED            FALSE
+#define ADC_REQUIRED            TRUE
 #define STM32_DMA_REQUIRED      TRUE    // Leave this macro name for OS
 
 #if 1 // ========================== GPIO =======================================
 // EXTI
 #define INDIVIDUAL_EXTI_IRQ_REQUIRED    FALSE
+
+#define BAT_MEAS_PIN    GPIOC, 0
 
 // Buttons
 #define BTNS_GPIO       GPIOB
@@ -50,7 +48,6 @@
 #define BTN_5_PIN       12
 #define BTN_6_PIN       13
 #define BTN_7_PIN       14
-
 
 // UART
 #define UART_GPIO       GPIOA
@@ -99,9 +96,6 @@
 #define SD_CLK          GPIOC, 12, omPushPull, pudNone,   SD_AF
 #define SD_CMD          GPIOD,  2, omPushPull, pudPullUp, SD_AF
 
-// Radio: SPI, PGpio, Sck, Miso, Mosi, Cs, Gdo0
-#define CC_Setup0       SPI1, GPIOA, 5,6,7, 4, 3
-
 #endif // GPIO
 
 #if 1 // =========================== SPI =======================================
@@ -113,16 +107,19 @@
 #endif
 
 #if ADC_REQUIRED // ======================= Inner ADC ==========================
+#define ADC_MEAS_PERIOD_MS  999
 // Clock divider: clock is generated from the APB2
-#define ADC_CLK_DIVIDER		adcDiv2
+#define ADC_CLK_DIVIDER		adcDiv4
 
 // ADC channels
-#define ADC_BATTERY_CHNL 	14
-// ADC_VREFINT_CHNL
+#define ADC_BATTERY_CHNL 	10
+#define ADC_VREFINT_CHNL    17
+
 #define ADC_CHANNELS        { ADC_BATTERY_CHNL, ADC_VREFINT_CHNL }
 #define ADC_CHANNEL_CNT     2   // Do not use countof(AdcChannels) as preprocessor does not know what is countof => cannot check
-#define ADC_SAMPLE_TIME     ast24d5Cycles
-#define ADC_OVERSAMPLING_RATIO  64   // 1 (no oversampling), 2, 4, 8, 16, 32, 64, 128, 256
+#define ADC_SAMPLE_TIME     ast55d5Cycles
+#define ADC_SAMPLE_CNT      8   // How many times to measure every channel
+#define ADC_SEQ_LEN         (ADC_SAMPLE_CNT * ADC_CHANNEL_CNT)
 #endif
 
 #if 1 // =========================== DMA =======================================
@@ -173,11 +170,6 @@
 #define I2C3_DMA_TX     STM32_DMA1_STREAM2
 #define I2C3_DMA_RX     STM32_DMA1_STREAM3
 #define I2C3_DMA_CHNL   3
-
-// ==== SAI ====
-#define SAI_DMA_A       STM32_DMA2_STREAM1
-#define SAI_DMA_B       STM32_DMA2_STREAM2
-#define SAI_DMA_CHNL    1
 
 // ==== SDMMC ====
 #define STM32_SDC_SDMMC1_DMA_STREAM   STM32_DMA_STREAM_ID(2, 5)

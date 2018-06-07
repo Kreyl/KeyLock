@@ -11,6 +11,7 @@
 #include "leds_pca.h"
 #include "sound.h"
 #include "btns.h"
+#include "kl_adc.h"
 //#include "battery_consts.h"
 
 #if 1 // =============== Low level ================
@@ -91,11 +92,9 @@ public:
 
 ftVoidVoid EvtOnSndEnd = nullptr;
 void BtnHandler(uint8_t KeybrdSide, uint8_t Btn);
-
 #endif
 
 int main() {
-#if 1 // Low level init
     // ==== Setup clock ====
 //    Clk.SetCoreClk(cclk48MHz);
     Clk.UpdateFreqValues();
@@ -116,24 +115,30 @@ int main() {
 
     BtnsInit();
 
-    SD.Init();
-    if (Settings.Load() != retvOk) {
-        Printf("Settings read error\r");
-        while(true);    // nothing to do if config not read
-    }
-
-//    SimpleSensors::Init();
-
     // Leds
     i2c1.Init();
     Pca9635.Init();
     LedA.Init();
     LedB.Init();
 
+    // SD and settings
+    SD.Init();
+    if (Settings.Load() != retvOk) { // nothing to do if config not read
+        Printf("Settings read error\r");
+        LedA.StartOrRestart(lsqError);
+        LedB.StartOrRestart(lsqError);
+        while(true) {
+            chThdSleepMilliseconds(999);
+        }
+    }
+
     // Sound
     Sound.Init();
     Sound.Play("alive.wav");
-#endif
+
+    // Adc
+    PinSetupAnalog(BAT_MEAS_PIN);
+    Adc.Init();
 
     Door.Init();
     ECode.Reset();
@@ -175,6 +180,10 @@ void ITask() {
                 ECode.Reset();
                 ECode.IsEnteringSideCode = false;
                 Sound.Play(SND_BTN_DROP);
+                break;
+
+            case evtIdAdcRslt:
+                Printf("Battery: %u mv\r", Msg.Value);
                 break;
 
             default: break;
