@@ -35,7 +35,7 @@
 
 #define VS_MAX_SPI_BAUDRATE_HZ  3400000
 
-enum sndState_t {sndStopped, sndPlaying};//, sndWritingZeroes};
+enum sndState_t {sndStopped, sndPlaying};
 
 union VsMsg_t {
     uint8_t ID;
@@ -47,18 +47,14 @@ union VsMsg_t {
     VsMsg_t(uint8_t AID) : ID(AID) {}
 } __attribute__((__packed__));
 
-//#define VSMSG_STOP              1
-#define VSMSG_DREQ_IRQ          2
-#define VSMSG_DMA_DONE          3
-#define VSMSG_COMPLETED         4
-#define VSMSG_READ_NEXT         5
+#define VSMSG_DREQ_IRQ          1
+#define VSMSG_DMA_DONE          2
+#define VSMSG_COMPLETED         3
+#define VSMSG_READ_NEXT         4
 
 extern EvtMsgQ_t<VsMsg_t, MAIN_EVT_Q_LEN> EvtQVs;
 
-#define VS_INITIAL_ATTENUATION  0x33
 #define VS_DATA_BUF_SZ          1024    // bytes. Must be multiply of 512.
-#define ZERO_SEQ_LEN            128     // After file end, send several zeroes
-
 
 struct VsBuf_t {
     uint8_t Data[VS_DATA_BUF_SZ], *PData;
@@ -66,22 +62,16 @@ struct VsBuf_t {
     FRESULT ReadFromFile(FIL *PFile) {
         PData = Data;   // Set pointer at beginning
         FRESULT rslt = f_read(PFile, Data, VS_DATA_BUF_SZ, &DataSz);
-//        Uart.Printf("\rRead %u\r", DataSz);
         return rslt;
     }
 };
-
-// Event mask to wake from IRQ
-#define VS_EVT_READ_NEXT    (eventmask_t)1
 
 class Sound_t : public IrqHandler_t {
 private:
     Spi_t ISpi{VS_SPI};
     VsBuf_t Buf1, Buf2, *PBuf;
-    uint32_t ZeroesCount;
     FIL IFile;
     bool IDmaIdle;
-    int16_t IAttenuation;
     const char* IFilename;
     uint32_t IStartPosition;
     // Pin operations
@@ -97,39 +87,30 @@ private:
     inline void StartTransmissionIfNotBusy() {
         chSysLock();
         if(IDmaIdle and IDreq.IsHi()) {
-//            PrintfI("TXinB\r");
             IDreq.EnableIrq(IRQ_PRIO_MEDIUM);
             IDreq.GenerateIrq();    // Do not call SendNexData directly because of its interrupt context
         }
         chSysUnlock();
     }
-//    void PrepareToStop();
-//    void SendZeroes();
     void IPlayNew();
-    void StopNow();
 public:
     sndState_t State;
     void Init();
     void Shutdown();
     void Play(const char* AFilename, uint32_t StartPosition = 0);
-    void Stop() {
-        StopNow();
-//        IFilename = NULL;
-//        EvtQVs.SendNowOrExit(VsMsg_t(VSMSG_STOP));
-    }
+    void Stop();
     void AmplifierOn();
     void AmplifierOff();
     // 0...254
     void SetVolume(uint8_t AVolume) {
         if(AVolume == 0xFF) AVolume = 0xFE;
-        IAttenuation = 0xFE - AVolume; // Transform Volume to attenuation
+        uint8_t IAttenuation = 0xFE - AVolume; // Transform Volume to attenuation
         WriteCmd(VS_REG_VOL, ((IAttenuation * 256) + IAttenuation));
     }
 
     uint32_t GetPosition() { return IFile.fptr; }
     // Inner use
     PinIrq_t IDreq{VS_DREQ, pudPullDown, this};
-    thread_reference_t PThread;
     void IIrqHandler();
     void ITask();
     void ISendNextData();
