@@ -50,6 +50,7 @@ union VsMsg_t {
 #define VSMSG_DREQ_IRQ          1
 #define VSMSG_DMA_DONE          2
 #define VSMSG_READ_NEXT         3
+#define VSMSG_PLAYNEW           4
 
 extern EvtMsgQ_t<VsMsg_t, MAIN_EVT_Q_LEN> EvtQVs;
 
@@ -89,6 +90,7 @@ private:
         }
         chSysUnlock();
     }
+    void IPlayNew();
 public:
     sndState_t State;
     void Init();

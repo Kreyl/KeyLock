@@ -24,6 +24,8 @@ EvtMsgQ_t<VsMsg_t, MAIN_EVT_Q_LEN> EvtQVs;
 
 static const uint8_t SZero = 0;
 
+static char NewFilename[256];
+
 // ================================= IRQ =======================================
 // Dreq IRQ
 void Sound_t::IIrqHandler() {
@@ -42,7 +44,7 @@ void SIrqDmaHandler(void *p, uint32_t flags) {
 }
 
 // =========================== Implementation ==================================
-static THD_WORKING_AREA(waSoundThread, 512);
+static THD_WORKING_AREA(waSoundThread, 4096);
 __noreturn
 static void SoundThread(void *arg) {
     chRegSetThreadName("Sound");
@@ -53,6 +55,7 @@ __noreturn
 void Sound_t::ITask() {
     while(true) {
         VsMsg_t Msg = EvtQVs.Fetch(TIME_INFINITE);
+//        Printf("Msg %d\r", Msg.ID);
         switch(Msg.ID) {
             case VSMSG_DREQ_IRQ:
                 ISendNextData();
@@ -72,12 +75,20 @@ void Sound_t::ITask() {
                 bool Eof = f_eof(&IFile);
                 // Read next if not EOF
                 if(!Eof) {
-                    if     (Buf1.DataSz == 0) { /*Uart.Printf(" r1");*/ rslt = Buf1.ReadFromFile(&IFile); }
-                    else if(Buf2.DataSz == 0) { /*Uart.Printf(" r2");*/ rslt = Buf2.ReadFromFile(&IFile); }
+                    if     (Buf1.DataSz == 0) {
+//                        Printf(" r1 ");
+                        rslt = Buf1.ReadFromFile(&IFile);
+                    }
+                    else if(Buf2.DataSz == 0) {
+//                        Printf(" r2 ");
+                        rslt = Buf2.ReadFromFile(&IFile);
+                    }
                 }
                 if(rslt != FR_OK) Printf("sndReadErr=%u\r", rslt);
-                if(rslt == FR_OK and !Eof) StartTransmissionIfNotBusy();
+//                if(rslt == FR_OK and !Eof) StartTransmissionIfNotBusy();
             } break;
+
+            case VSMSG_PLAYNEW: IPlayNew(); break;
 
             default: break;
         } // switch
@@ -141,14 +152,18 @@ void Sound_t::Init() {
 }
 
 void Sound_t::Play(const char* AFilename, uint32_t StartPosition) {
-    if(State == sndPlaying) Stop();
-    if(StartPosition & 1) StartPosition--;
+    strcpy(NewFilename, AFilename);
+    EvtQVs.SendNowOrExit(VsMsg_t(VSMSG_PLAYNEW));
+}
+
+void Sound_t::IPlayNew() {
+    Stop();
     FRESULT rslt;
     // Open new file
-    Printf("Play %S at %u\r", AFilename, StartPosition);
-    rslt = f_open(&IFile, AFilename, FA_READ+FA_OPEN_EXISTING);
+    Printf("Play %S\r", NewFilename);
+    rslt = f_open(&IFile, NewFilename, FA_READ+FA_OPEN_EXISTING);
     if (rslt != FR_OK) {
-        if (rslt == FR_NO_FILE) Printf("%S: not found\r", AFilename);
+        if (rslt == FR_NO_FILE) Printf("%S: not found\r", NewFilename);
         else Printf("OpenFile error: %u\r", rslt);
         Stop();
         return;
@@ -159,10 +174,6 @@ void Sound_t::Play(const char* AFilename, uint32_t StartPosition) {
         Printf("Empty file\r");
         Stop();
         return;
-    }
-    // Fast forward to start position if not zero
-    if(StartPosition != 0) {
-        if(StartPosition < IFile.obj.objsize) f_lseek(&IFile, StartPosition);
     }
 
     // Initially, fill both buffers
@@ -196,29 +207,32 @@ void Sound_t::Shutdown() {
 
 #define VS_TIMEOUT              8000000
 void Sound_t::Stop() {
-    dmaWaitCompletion(VS_DMA);
-    dmaStreamDisable(VS_DMA);
-    AmplifierOff();
-    WriteCmd(VS_REG_RECCTRL, VS_SARC_OUTOFADPCM | VS_SARC_DREQ512);
-    f_close(&IFile);
-
-    volatile uint32_t Timeout = VS_TIMEOUT;
+//    Printf("%S\r", __FUNCTION__);
     IDreq.DisableIrq();
+    volatile uint32_t Timeout = VS_TIMEOUT;
     while(!IDreq.IsHi()) {
         Timeout--;
         if(Timeout == 0) break;
     }
+    dmaStreamDisable(VS_DMA);
+
     ISpi.WaitBsyHi2Lo();
     XDCS_Lo();
-    for (uint32_t i=0; i<11; i++) ISpi.ReadWriteByte(0);
+    for (uint32_t i=0; i<207; i++) ISpi.ReadWriteByte(0);
     XDCS_Hi();
 
+    AmplifierOff();
+    WriteCmd(VS_REG_RECCTRL, VS_SARC_OUTOFADPCM | VS_SARC_DREQ512);
+    f_close(&IFile);
+
+    while(EvtQVs.Fetch(TIME_IMMEDIATE).ID != 0); // Flush queue
     State = sndStopped;
     IDmaIdle = true;
 }
 
 // ================================ Inner use ==================================
 void Sound_t::ISendNextData() {
+//    Printf("%S\r", __FUNCTION__);
     dmaStreamDisable(VS_DMA);
     IDmaIdle = false;
     switch(State) {
@@ -237,11 +251,12 @@ void Sound_t::ISendNextData() {
             // Send next piece of data
             XDCS_Lo();  // Start data transmission
             uint32_t FLength = (PBuf->DataSz > 512)? 512 : PBuf->DataSz;
+//            Printf("SND L %d, B %d\r", FLength, (PBuf == &Buf1)? 1 : 2);
+
             dmaStreamSetMemory0(VS_DMA, PBuf->PData);
             dmaStreamSetTransactionSize(VS_DMA, FLength);
             dmaStreamSetMode(VS_DMA, VS_DMA_MODE | STM32_DMA_CR_MINC);  // Memory pointer increase
             dmaStreamEnable(VS_DMA);
-//            if(PBuf == &Buf1) Printf("*"); else Printf("#");
             // Process pointers and lengths
             PBuf->DataSz -= FLength;
             PBuf->PData += FLength;
@@ -250,6 +265,7 @@ void Sound_t::ISendNextData() {
         case sndStopped:
             if(!IDreq.IsHi()) IDreq.EnableIrq(IRQ_PRIO_MEDIUM);
             else IDmaIdle = true;
+            break;
     } // switch
 }
 

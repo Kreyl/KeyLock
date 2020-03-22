@@ -19,4 +19,6 @@ enum EvtMsgId_t {
     evtIdSoundEnd,
     evtIdButtons,
     evtIdTimeToDrop,
+
+    evtIdSoundEvt,
 };
